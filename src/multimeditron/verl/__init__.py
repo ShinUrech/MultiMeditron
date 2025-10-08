@@ -1,6 +1,7 @@
 import ray
 import random
 from omegaconf import OmegaConf
+from multimeditron.verl.service import initialize_services
 
 @ray.remote(num_cpus=1)
 class TaskRunner:
@@ -48,6 +49,11 @@ class TaskRunner:
             Role.Critic: global_pool_id,
             Role.RefPolicy: global_pool_id,
         }
+
+        # Initialize services from the configuration
+        if cfg.get("services", None) is not None:
+            print("Initializing services...")
+            initialize_services(cfg.services)
 
         # We should adopt a multi-source reward function here
         # - for rule-based rm, we directly call a reward score

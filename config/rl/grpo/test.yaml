@@ -5,14 +5,21 @@ hydra:
 
 defaults:
   - verl_trainer
+  - nsjail-python-exec-pool
   - _self_
 
 data:
   train_files:
     - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd.parquet
-    # - ./mock_dataset/mock_dataset.parquet
   val_files:
     - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd-val.parquet
-    # - ./mock_dataset/mock_dataset.parquet
   prompt_key: prompt
   reward_fn_key: data_source
+
+# actor_rollout_ref:
+#   rollout:
+#     multi_turn:
+#       enable: true
+#       max_tool_response_length: 2048
+#       tokenization_sanity_check_mode: strict
+#       tool_config_path: /users/gboye/MultiMeditron/config/rl/grpo/tools.yaml

@@ -1,0 +1,16 @@
+tools:
+  - class_name: multimeditron.tools.python_tools.PythonTools
+    config:
+      type: native
+    tool_schema:
+      type: function
+      function:
+        name: python_exec
+        description: "Execute python code in a secure sandboxed environment."
+        parameters:
+          type: "object"
+          properties:
+            code:
+              type: "string"
+              description: "The python code to execute."
+          required: ["code"]
