@@ -27,9 +27,10 @@ class PyExecService:
         data = await request.json()
         try:
             code = data.get("code", "")
+            stdin = data.get("stdin", None)
 
             # execute code in nsjail
-            result = await self.executor.execute.remote(user_code=code,)
+            result = await self.executor.execute.remote(user_code=code, stdin=stdin)
 
             return result
         except Exception as e:
@@ -49,6 +50,24 @@ def _serve():
             "max_time_limit": 5, # 5 seconds of wall time
             "max_open_fds": 16,  # max number of open file descriptors is 16
             "allow_network": False,
+            "ro_mounts": [
+                "/lib",
+                "/lib64",
+                "/usr/lib",
+                "/usr/lib64",
+                "/bin/sh",
+                "/dev/random",
+                "/etc/ld.so.cache",
+            ],
+            "envs": {
+                "LANG": "en_US.UTF-8",
+                "OMP_NUM_THREADS": "1",  # limit to 1 thread
+                "OPENBLAS_NUM_THREADS": "1",
+                "MKL_NUM_THREADS": "1",
+                "VECLIB_MAXIMUM_THREADS": "1",
+                "NUMEXPR_NUM_THREADS": "1",
+                "PYTHONIOENCODING": "utf-8:strict",
+            },
         }
     })
 

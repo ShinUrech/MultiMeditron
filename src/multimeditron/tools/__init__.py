@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 import tempfile
 import subprocess
-import random
+import pathlib
 import shutil
 import ray
 import time
@@ -17,16 +17,18 @@ class NsJailExecutor:
     def __init__(self, cfg):
         self.nsjail_path = cfg.nsjail.path
         self.python_path = cfg.python.path
-        self.readonly_mounts = [
-            # self.python_path,
-            "/lib",
-            "/lib64",
-            "/usr/lib",
-            "/usr/local/lib",
-            "/bin/sh",
-            "/dev/random",
-            "/etc/ld.so.cache",
-        ]
+        self.readonly_mounts = cfg.nsjail.ro_mounts
+        self.env_vars = cfg.nsjail.envs
+        # self.readonly_mounts = [
+        #     # self.python_path,
+        #     "/lib",
+        #     "/lib64",
+        #     "/usr/lib",
+        #     "/usr/local/lib",
+        #     "/bin/sh",
+        #     "/dev/random",
+        #     "/etc/ld.so.cache",
+        # ]
 
         self.max_rlimit_as = cfg.nsjail.get("max_rlimit_as", 256 * 1024 * 1024)  # 256MB
         self.max_rlimit_cpu = cfg.nsjail.get("max_rlimit_cpu", 2)  # 2 seconds of CPU time
@@ -46,15 +48,50 @@ class NsJailExecutor:
                 timeout=5
             )
             python_base_prefix = stdout.strip()
-            logger.info("Python prefix inside jail: %s", python_base_prefix)
-            print(python_base_prefix)
+            print("Python prefix inside jail:", python_base_prefix)
             self.readonly_mounts.append(python_base_prefix)
         except Exception as e:
             logger.error("Error getting python base_prefix: %s", str(e))
             raise RuntimeError(f"Error getting python base_prefix: {str(e)}")
+        
+        # Get a list of all site-packages dirs
+        try:
+            stdout = subprocess.check_output(
+                [self.python_path, "-c", "import site; print('\\n'.join(site.getsitepackages()))"],
+                text=True,
+                timeout=5
+            )
+            site_packages = stdout.strip().splitlines()
+            print("Site-packages inside jail:", site_packages)
+            self.readonly_mounts.extend(site_packages)
+        except Exception as e:
+            logger.error("Error getting python site-packages: %s", str(e))
+            raise RuntimeError(f"Error getting python site-packages: {str(e)}")
+        
+        # Exec python path to get sys-executable real path (not a symlink)
+        try:
+            stdout = subprocess.check_output(
+                [self.python_path, "-c", "import sys; print(sys.executable)"],
+                text=True,
+                timeout=5
+            )
+            self.python_path = stdout.strip()
+            print("Python executable inside jail:", self.python_path)
+            self.readonly_mounts.append(self.python_path)
+            self.env_vars["PYTHONPATH"] = os.pathsep.join(site_packages)
+        except Exception as e:
+            logger.error("Error getting python executable: %s", str(e))
+            raise RuntimeError(f"Error getting python executable: {str(e)}")
 
-
-
+    def _fix_duplicated_mounts(self):
+        # Remove duplicates (or subpaths) from readonly_mounts
+        unique_mounts = []
+        for path in self.readonly_mounts:
+            path = os.path.abspath(path)
+            if not any(path == um or path.startswith(um + '/') for um in unique_mounts):
+                unique_mounts.append(path)
+        self.readonly_mounts = unique_mounts
+        
     def _build_nsjail_cmd(self,
                           workdir: str,
                           code_filename: str,
@@ -107,16 +144,16 @@ class NsJailExecutor:
 
         # Bind-mount the python interpreter (if needed). If interpreter is available inside chroot, skip this.
         # Note: bind-mounting interpreter may not be sufficient if shared libs are needed (more bind mounts required).
-        if os.path.exists(self.python_path):
-            # python_path = os.path.dirname(os.path.abspath(self.python_path))
-            # cmd += [
-            #     "--bindmount", f"{self.python_path}:/usr/local/bin/python:ro",
-            # ]
-            for ro_path in self.readonly_mounts:
-                if os.path.exists(ro_path):
-                    cmd += ["--bindmount", f"{ro_path}:{ro_path}:ro"]
-                else:
-                    logger.warning("Readonly mount path does not exist and will be skipped: %s", ro_path)
+        for ro_path in self.readonly_mounts:
+            if os.path.exists(ro_path):
+                cmd += ["--bindmount", f"{ro_path}:{ro_path}:ro"]
+            else:
+                logger.warning("Readonly mount path does not exist and will be skipped: %s", ro_path)
+                print("Readonly mount path does not exist and will be skipped:", ro_path)
+
+        # Environment variables to pass inside the jail
+        for k, v in self.env_vars.items():
+            cmd += ["--env", f"{k}={v}"]
 
         # As final part, the program to execute inside the jail
         cmd += ["--", f"{self.python_path}", "/code.py"]
@@ -153,6 +190,7 @@ class NsJailExecutor:
             raise FileNotFoundError(f"The path '{path}' is not an executable file or is not accessible. Install it and ensure it is accessable from the worker nodes.")
 
     def execute(self, user_code: str, *,
+                stdin: Optional[str] = None,
                 rlimit_as: Optional[int] = None,
                 rlimit_cpu: Optional[int] = None,
                 time_limit: Optional[int] = None,
@@ -186,14 +224,14 @@ class NsJailExecutor:
                 cwd=workdir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                stdin=subprocess.DEVNULL,
+                stdin=subprocess.PIPE,
                 text=True,
                 bufsize=1,
                 preexec_fn=os.setsid # helps killing the whole process group on timeout
             )
 
             try:
-                stdout, stderr = proc.communicate(timeout=wall_timeout)
+                stdout, stderr = proc.communicate(input=stdin, timeout=wall_timeout)
                 exit_code = proc.returncode
             except subprocess.TimeoutExpired:
                 timed_out = True
