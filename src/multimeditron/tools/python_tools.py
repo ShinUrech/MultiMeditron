@@ -29,7 +29,12 @@ class PythonTools(BaseTool):
     def __init__(self, config: dict, tool_schema: OpenAIFunctionToolSchema):
         super().__init__(config, tool_schema)
         self._instance_map = {}
-        self._executor_pool: NsJailPythonExecutorPool = get_nsjail_python_executor_pool()
+
+        try:
+            self._executor_pool: NsJailPythonExecutorPool = get_nsjail_python_executor_pool()
+        except Exception as e:
+            print(f"Failed to get nsjail python executor pool: {e}. Did you initialize the service? Add it to the services section in the config.")
+            raise e
 
     async def create(
         self,

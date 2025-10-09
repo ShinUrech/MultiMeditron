@@ -16,10 +16,10 @@ data:
   prompt_key: prompt
   reward_fn_key: data_source
 
-# actor_rollout_ref:
-#   rollout:
-#     multi_turn:
-#       enable: true
-#       max_tool_response_length: 2048
-#       tokenization_sanity_check_mode: strict
-#       tool_config_path: /users/gboye/MultiMeditron/config/rl/grpo/tools.yaml
+actor_rollout_ref:
+  rollout:
+    multi_turn:
+      enable: true
+      max_tool_response_length: 2048
+      tokenization_sanity_check_mode: strict
+      tool_config_path: /users/gboye/MultiMeditron/config/rl/grpo/tools.yaml

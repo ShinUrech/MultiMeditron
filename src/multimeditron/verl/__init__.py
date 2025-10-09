@@ -53,7 +53,7 @@ class TaskRunner:
         # Initialize services from the configuration
         if cfg.get("services", None) is not None:
             print("Initializing services...")
-            initialize_services(cfg.services)
+            self.services = initialize_services(cfg.services)
 
         # We should adopt a multi-source reward function here
         # - for rule-based rm, we directly call a reward score

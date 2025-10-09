@@ -356,6 +356,7 @@ def init_nsjail_python_executor(cfg) -> NsJailPythonExecutorPool:
     mem_per_job += limits['max_rlimit_as']  # add max memory limit to actor memory
 
     # Create Ray actor replicas
+    print("Creating nsjail python executor pool with", parallelism, "actors")
     executors = [
         ray.remote(NsJailPythonExecutor).options(
             name=f"nsjail-python-exec-{i}",
@@ -367,9 +368,7 @@ def init_nsjail_python_executor(cfg) -> NsJailPythonExecutorPool:
         ).remote(cfg) for i in range(parallelism)
     ]
 
-    pool = NsJailPythonExecutorPool.remote(executors, cfg)
-    ray.put(pool)
-    return pool
+    return NsJailPythonExecutorPool.remote(executors, cfg)
 
 def get_nsjail_python_executor_pool():
     try:
