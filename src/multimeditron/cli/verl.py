@@ -10,6 +10,28 @@ import ray
 
 logger = logging.getLogger(__name__)
 
+@main_cli.command(epilog=EPILOG)
+@click.option("--output", "-o", type=click.Path(), help="Path to save the final configuration used for training (in YAML format).")
+def verl_config(output: Optional[str] = None):
+    from hydra import initialize_config_dir, compose
+    from omegaconf import OmegaConf
+
+    verl_path = os.path.dirname(os.path.abspath(__file__))
+    config_dir = os.path.join(verl_path, "../../../third-party/verl/verl/trainer/config")
+    config_dir = os.path.abspath(config_dir)
+    print(config_dir)
+    with initialize_config_dir(config_dir=config_dir, version_base="1.2"):
+        cfg = compose(config_name="ppo_trainer")
+
+    if output is not None:
+        logger.info(f"Saving final configuration to {output}...")
+        with open(output, "w") as f:
+            yaml.dump(OmegaConf.to_container(cfg, resolve=True), f, sort_keys=False)
+        logger.info(f"Final configuration saved to {output}")
+    else:
+        print(OmegaConf.to_yaml(cfg))
+
+
 @main_cli.command(epilog=EPILOG, context_settings=dict(ignore_unknown_options=True, allow_extra_args=True))
 @click.option("--config", "-c", type=click.Path(exists=True), help="Path to the configuration file(s) in YAML format.")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging.")

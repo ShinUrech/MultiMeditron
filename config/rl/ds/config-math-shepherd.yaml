@@ -30,12 +30,17 @@ processes:
   - type: python
     kwargs:
       remove_columns: ['labels', 'completions']
-      imports: ['re']
+      imports: ['re', 'random']
       func: |
         {
-          "prompt": [{"content": data["prompt"], "role": "user"}],
+          "prompt": [{"content": data["prompt"] + ["", "Use python to evaluate any math expression you may have. You can print(formula)"][random.randint(0, 1)], "role": "user"}],
           "reward_model": {"ground_truth": data["completions"]},
           "data_source": "math-shepherd",
+          "extra_info": {
+            "tools_kwargs": {
+              "python_exec": {"dummy": "dummy"},
+            }
+          },
         }
   
   - type: shuffle
