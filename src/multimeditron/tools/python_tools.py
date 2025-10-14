@@ -63,8 +63,10 @@ class PythonTools(BaseTool):
             code = str(code)
         
         result = await self._executor_pool.execute.remote(code)
-        self._instance_map[instance_id]["response"] = result
-        return ToolResponse(text=result), None, None
+        print(result)
+
+        self._instance_map[instance_id]["response"] = result['stdout']
+        return ToolResponse(text=result['stdout']), None, None
 
     async def calc_reward(self, instance_id, **kwargs) -> float:
         return self._instance_map[instance_id]["reward"]

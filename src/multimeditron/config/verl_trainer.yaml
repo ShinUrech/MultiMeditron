@@ -3,8 +3,8 @@ defaults:
   - _self_
 
 data:
-  max_prompt_length: 512
-  max_response_length: 1024
+  max_prompt_length: 2048
+  max_response_length: 2048
   trust_remote_code: ${trust_remote_code}
   train_batch_size: 8
   val_batch_size: 8
@@ -56,7 +56,7 @@ actor_rollout_ref:
     max_model_len: null
     max_num_batched_tokens: 8192
     max_num_seqs: 1024
-    n: 1
+    n: 128
     load_format: auto
     dtype: bfloat16
     name: sglang

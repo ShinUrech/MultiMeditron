@@ -29,6 +29,7 @@ class NsJailPythonExecutor:
 
         self.max_limits = NsJailPythonExecutor._extract_hard_limits(cfg)
         self.allow_network = cfg.nsjail.get("allow_network", False)
+        self.merged_stderr = cfg.nsjail.get("merged_stderr", False)
 
         self._ensure_path_executable(self.nsjail_path)
         self._ensure_path_executable(self.python_path)
@@ -161,6 +162,7 @@ class NsJailPythonExecutor:
             "--rlimit_fsize", str(5 * 1024 * 1024),  # 5MB
             "--rlimit_nofile", str(limits['open_fds']),
             "--keep_caps", # keep capabilities false? nsjail may drop them anyway
+            "--quiet",
         ]
 
         # Bind-mount the code file into the chroot so python inside the jail can access it.
@@ -251,7 +253,7 @@ class NsJailPythonExecutor:
                 cmd,
                 cwd=workdir,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT if self.merged_stderr else subprocess.PIPE,
                 stdin=subprocess.PIPE,
                 text=True,
                 bufsize=1,
@@ -291,6 +293,7 @@ class NsJailPythonExecutor:
             "stdout": stdout,
             "stderr": stderr,
             "duration_s": duration,
+            "code": user_code,
             "meta": {
                 "nsjail_path": self.nsjail_path,
                 "python_path": self.python_path,

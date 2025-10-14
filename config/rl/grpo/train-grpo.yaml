@@ -25,5 +25,6 @@ actor_rollout_ref:
     multi_turn:
       enable: true
       max_tool_response_length: 2048
+      max_assistant_turns: 5
       tokenization_sanity_check_mode: strict
       tool_config_path: /users/gboye/MultiMeditron/config/rl/grpo/tools.yaml

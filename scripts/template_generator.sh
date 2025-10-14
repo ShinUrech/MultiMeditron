@@ -3,6 +3,8 @@
 set -e
 
 # Set the multline jinja2_template variable
+# For information on the template check `sglang/srt/function_call/llama32_detector.py` for details
+# on the expected tool call format
 jinja2_template=$(cat << 'EOF'
 ; ============= Jinja2 Template for Chat Models =============
 {%- if not date_string is defined %}
@@ -26,18 +28,14 @@ Today Date: {{ date_string }}\n
 {%- if tools is not none and tools|length > 0 %}
   # Tools\n
   You may call one or more functions to assist with the user query.\n
-  You are provided with function signatures within <tools></tools> XML tags:\n
-  \n
-  <tools>{{ "\n[\n" }}
+  Here are the available tools:
+  {{ "\\n```\\n[\\n" }}
   {%- for tool in tools %}
-  {{ tool | tojson + ",\\n" }}
+  {{ tool | tojson | indent(2, true) + ",\\n" }}
   {%- endfor %}
-  ]\n</tools>\n
-  \n
-  For each function call, return a json object with function name and arguments within <tool_calls></tool_calls> XML tags:\n
-  <tool_calls>\n
-  {"name": <function-name>, "arguments": <args-json-object>}\n
-  </tool_calls><|eot_id|>\n
+  {{ "]\\n```\\n\\n" }}
+  For each function call, start with the <|python_tag|> tag, then provide a JSON object with the function name and arguments. Separate multiple function calls with a semicolon `;`.\n
+  <|python_tag|>{"name": <function-name>, "arguments": <args-json-object>}<|eot_id|>\n
 {%- endif %}
 
 ; ============= Chat Messages =============
@@ -60,10 +58,10 @@ Today Date: {{ date_string }}\n
       {%- if tool_call.function is defined %}
         {%- set tool_call=tool_call.function %}
       {%- endif %}
-      <tool_call>\n
-      {"name": "{{ tool_call.name }}", "arguments": {{ tool_call.arguments | tojson }}} {{ "\\n" }}
-      </tool_call>{{ "\\n" }}<|eot_id|>
+      <|python_tag|>{"name": "{{ tool_call.name }}", "arguments": {{ tool_call.arguments | tojson }}}
+      {%- if not loop.last %};{%- endif %}
     {%- endfor %}
+    <|eot_id|>
   {%- elif message['role'] == 'tool' %}
     <|start_header_id|>ipython<|end_header_id|>{{ "\\n\\n" }}
     {%- if message.content is mapping or message.content is iterable %}
@@ -108,7 +106,7 @@ rendered = template.render(
     messages=[
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "What's the weather like in Boston?"},
-        {"role": "assistant", "content": "I can help with that! Let me check the weather for you.", "tool_calls": [{"function": {"name": "get_current_weather", "arguments": {"location": "Boston, MA", "unit": "celsius"}}}]},
+        {"role": "assistant", "content": "I can help with that! Let me check the weather for you.", "tool_calls": [{"function": {"name": "get_current_weather", "arguments": {"location": "Boston, MA", "unit": "celsius"}}}, {"function": {"name": "pretty_display", "arguments": {"data": {"temperature": 22}}}}]},
         {"role": "tool", "content": {"temperature": 22, "unit": "celsius", "description": "clear sky"}},
         {"role": "assistant", "content": "The current weather in Boston is 22 degrees Celsius with clear skies."},
     ],

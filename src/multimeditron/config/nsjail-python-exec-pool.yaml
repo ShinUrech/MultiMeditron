@@ -10,6 +10,7 @@ services:
       path: /opt/conda/envs/py312/bin/python3.12
     nsjail:
       path: /usr/bin/nsjail
+      merged_stderr: true # merge stderr into stdout
       max_rlimit_as: 314572800 # 300 * 1024 * 1024 = 300MB
       max_rlimit_cpu: 2 # 2 seconds of CPU time
       max_time_limit: 5 # 5 seconds of wall time
