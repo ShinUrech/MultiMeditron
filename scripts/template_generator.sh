@@ -1,86 +1,140 @@
 #!/bin/bash
 
 set -e
-jinja2_template=""
 
-# Script to generate jinja2 template for chat models
-jinja2_template+="{%- if not date_string is defined %}"
-jinja2_template+="{%- set date_string = \"01 Oct 2025\" %}"
-jinja2_template+="{%- endif %}"
-jinja2_template+="{%- if not tools is defined %}"
-jinja2_template+="{%- set tools = none %}"
-jinja2_template+="{%- endif %}"
+# Set the multline jinja2_template variable
+jinja2_template=$(cat << 'EOF'
+; ============= Jinja2 Template for Chat Models =============
+{%- if not date_string is defined %}
+  {%- set date_string = "01 Oct 2025" %}
+{%- endif %}
+{%- if not tools is defined %}
+  {%- set tools = none %}
+{%- endif %}
+{%- if messages[0]['role'] == 'system' %}
+  {%- set system_message = messages[0]['content'] | trim %}
+  {%- set messages = messages[1:] %}
+{%- else %}
+  {%- set system_message = "You are a helpful assistant." %}
+{%- endif %}
 
-jinja2_template+="{%- if messages[0]['role'] == 'system' %}"
-jinja2_template+="{%- set system_message = messages[0]['content'] | trim %}"
-jinja2_template+="{%- set messages = messages[1:] %}"
-jinja2_template+="{%- else %}"
-jinja2_template+="{%- set system_message = \"You are a helpful assistant.\" %}"
-jinja2_template+="{%- endif %}"
+; ============= System Prompt =============
+<|start_header_id|>system<|end_header_id|>\n
+Cutting Knowledge Date: 01 Oct 2025\n
+Today Date: {{ date_string }}\n
+{{ "\\n" + system_message | trim + "\\n\\n" }}
+{%- if tools is not none and tools|length > 0 %}
+  # Tools\n
+  You may call one or more functions to assist with the user query.\n
+  You are provided with function signatures within <tools></tools> XML tags:\n
+  \n
+  <tools>{{ "\n[\n" }}
+  {%- for tool in tools %}
+  {{ tool | tojson + ",\\n" }}
+  {%- endfor %}
+  ]\n</tools>\n
+  \n
+  For each function call, return a json object with function name and arguments within <tool_calls></tool_calls> XML tags:\n
+  <tool_calls>\n
+  {"name": <function-name>, "arguments": <args-json-object>}\n
+  </tool_calls><|eot_id|>\n
+{%- endif %}
 
+; ============= Chat Messages =============
+{%- for message in messages %}
+  {%- if (message['role'] == 'user') or (message['role'] == 'system') or (message['role'] == 'assistant' and not message.tool_calls) %}
+    <|start_header_id|>{{ message['role'] }}<|end_header_id|>{{ "\\n\\n" }}
+    {%- if message['content'] %}
+      {{ message['content'] | trim }}
+    {%- else %}
+      {%- for content in message['content'] %}
+        {%- if 'text' in content %}{{ content['text'] + "\\n" }}{%- endif %}
+      {%- endfor %}
+    {%- endif %}<|eot_id|>
+  {%- elif message['role'] == 'assistant' %}
+    <|start_header_id|>assistant<|end_header_id|>{{ "\\n\\n" }}
+    {%- if message.content and message.content | trim | length > 0 %}
+      {{ message['content'] | trim + "\\n\\n" }}
+    {%- endif %}
+    {%- for tool_call in message.tool_calls %}
+      {%- if tool_call.function is defined %}
+        {%- set tool_call=tool_call.function %}
+      {%- endif %}
+      <tool_call>\n
+      {"name": "{{ tool_call.name }}", "arguments": {{ tool_call.arguments | tojson }}} {{ "\\n" }}
+      </tool_call>{{ "\\n" }}<|eot_id|>
+    {%- endfor %}
+  {%- elif message['role'] == 'tool' %}
+    <|start_header_id|>ipython<|end_header_id|>{{ "\\n\\n" }}
+    {%- if message.content is mapping or message.content is iterable %}
+      {{ message['content'] | tojson }}
+    {%- else %}
+      {{ message['content'] | trim }}
+    {%- endif %}<|eot_id|>
+  {%- endif %}
+{%- endfor %}
 
-# This script generates the chat_template jinja2 template based on the provided configuration file.
-jinja2_template+="{{- bos_token }}"
-jinja2_template+="{{- \"<|start_header_id|>system<|end_header_id|>\" }}"
-jinja2_template+="{{- \"Cutting Knowledge Date: 01 Oct 2025\n\" }}"
-jinja2_template+="{{- \"Today Date: \" + date_string + \"\n\" }}"
+; ============= Generation Prompt =============
+{%- if add_generation_prompt %}
+  <|start_header_id|>assistant<|end_header_id|>{{ "\\n\\n" }}
+{%- endif %}
 
-jinja2_template+="{%- if tools is not none and tools|length > 0 %}"
-jinja2_template+="{{- \"You may call one or more functions to assist with the user query.\n\" }}"
-jinja2_template+="{{- \"You are provided with function signatures within <tools></tools> XML tags:\n\" }}"
-jinja2_template+="{{- \"<tools>\n\" }}"
-jinja2_template+="{%- for tool in tools %}"
-jinja2_template+="{{- tool | tojson + \"\n\" }}"
-jinja2_template+="{{- \"\n\n\" }}"
-jinja2_template+="{%- endfor %}"
-jinja2_template+="{{- \"</tools>\n\n\" }}"
-jinja2_template+="{{- \"For each function call, return a json object with function name and arguments within <tool_calls></tool_calls> XML tags:\n\" }}"
-jinja2_template+="{{- \"<tool_calls>\n\" }}"
-jinja2_template+="{{- '{\"name\": <function-name>, \"arguments\": <args-json-object>}' }}"
-jinja2_template+="{{- \"</tool_calls>\n\n\" }}"
-jinja2_template+="{%- endif %}"
+EOF
+)
 
-jinja2_template+="{{- system_message + \"<|eot_id|>\" }}"
+# Remove all lines starting with ;
+jinja2_template=$(echo "$jinja2_template" | sed '/^;/d')
 
-# Iterate over messages and format them
-jinja2_template+="{%- for message in messages %}"
-jinja2_template+="{%- if (message['role'] == 'user') or (message['role'] == 'system' and not loop.first ) or (message['role'] == 'assistant' and not message.tool_calls) %}"
-jinja2_template+="<|start_header_id|>{{ message['role'] }}<|end_header_id|>\n\n"
-jinja2_template+="{%- if message['content'] %}"
-jinja2_template+="{{ message['content'] | trim }}"
-jinja2_template+="{% else %}"
-jinja2_template+="{%- for content in message['content'] %}"
-jinja2_template+="{%- if 'text' in content %}{{ content['text'] }}{%- endif %}"
-jinja2_template+="{%- endfor %}"
-jinja2_template+="{%- endif %}"
-jinja2_template+="<|eot_id|>"
-jinja2_template+="{%- elif message['role'] == 'assistant' %}"
-jinja2_template+="{{- \"<|start_header_id|>assistant<|end_header_id|>\n\n\" }}"
-jinja2_template+="{%- if message.content %}"
-jinja2_template+="{{ message['content'] }}"
-jinja2_template+="{%- endif %}"
-jinja2_template+="{%- for tool_call in message.tool_calls %}"
-jinja2_template+="{%- if tool_call.function is defined %}{%- set tool_call=tool_call.function %}{%- endif %}"
-jinja2_template+="<tool_call>\n"
-jinja2_template+="{\"name\": \"{{ tool_call.name }}\", \"arguments\": {{ tool_call.arguments | tojson }}} {{- "\n" }}"
-jinja2_template+="</tool_call>\n"
-jinja2_template+="{%- endfor %}"
+# Remove all leading spaces
+jinja2_template=$(echo "$jinja2_template" | sed 's/^[ \t]*//')
 
-jinja2_template+="{%- endif %}"
-jinja2_template+="{%- endfor %}"
-# jinja2_template+="{{- \"<|start_header_id|>\" + message['role'] + \"<|end_header_id|>\n\n\" + message['content'] | trim + \"<|eot_id|>\" }}"
+# Remove all literal new lines
+jinja2_template=$(echo "$jinja2_template" | tr -d '\n')
 
-# If should add generation prompt, add it
-jinja2_template+="{%- if add_generation_prompt %}"
-jinja2_template+="{{- \"<|start_header_id|>assistant<|end_header_id|>\n\n\" }}"
-jinja2_template+="{%- endif %}"
-jinja2_template="  $jinja2_template"
+# Escape all quotes and single quotes
+jinja2_template=$(echo "$jinja2_template" | sed 's/"/\\"/g')
 
-# echo "  $jinja2_template"
+# A small python snippet to test rendering the jinja2 template
+python_code=$(cat << 'PYTHON_EOF'
+import jinja2, os
+
+jinja2_template = os.environ['jinja2_template']
+template = jinja2.Template(jinja2_template)
+rendered = template.render(
+    date_string="27 Apr 2024",
+    tools=[
+        {"name": "get_current_weather", "description": "Get the current weather in a given location", "parameters": {"type": "object", "properties": {"location": {"type": "string", "description": "The city and state, e.g. San Francisco, CA"}, "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}}, "required": ["location"]}},
+    ],
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What's the weather like in Boston?"},
+        {"role": "assistant", "content": "I can help with that! Let me check the weather for you.", "tool_calls": [{"function": {"name": "get_current_weather", "arguments": {"location": "Boston, MA", "unit": "celsius"}}}]},
+        {"role": "tool", "content": {"temperature": 22, "unit": "celsius", "description": "clear sky"}},
+        {"role": "assistant", "content": "The current weather in Boston is 22 degrees Celsius with clear skies."},
+    ],
+    add_generation_prompt=True,
+    bos_token="",
+)
+print(rendered)
+PYTHON_EOF
+)
 
 if [ "$#" -ne 1 ]; then
-    echo $jinja2_template
+    printf "%s" "$jinja2_template"
+    echo
+
+    # Render the jinja2 template to verify it's correct
+    echo "----- Rendered Template Preview -----"
+
+    # Replace all '\n' with actual new lines for rendering
+    jinja2_template=$(printf "%b" "$jinja2_template" | sed 's/\\"/"/g')
+
+    export jinja2_template
+    python3 -c "$python_code"
+
+    echo "----- End of Rendered Template Preview -----"
 else
-    escaped=$(printf '%s\n' "$jinja2_template" | sed -e 's/[\/&]/\\&/g')
-    awk -v jinja2_template="$escaped" 'NR==2{$0=jinja2_template}1' $1 > tmpfile && mv tmpfile $1
+    escaped=$(printf 'custom_chat_template: "%s"' "$jinja2_template" | sed -e 's/[\/&]/\\&/g')
+    printf '%s\n' "$escaped"
+    awk -v jinja2_template="$escaped" 'NR==1{$0=jinja2_template}1' $1 > tmpfile && mv tmpfile $1
 fi
