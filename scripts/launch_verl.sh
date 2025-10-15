@@ -1,0 +1,181 @@
+#!/bin/bash
+
+# -----------------------------------
+# Script: launch_verl.sh
+# Description: Launches a SLURM job for training using Ray with VERL dependencies.
+# -----------------------------------
+
+# If run from an interactive shell, make sure that SLURM environment variables are not set
+unset ${!SLURM_*}
+
+# Global, constants
+PURPOSE_STRING="Launch a SLURM job for training using Ray with VERL dependencies."
+USAGE_STRING=$(cat <<EOF
+Usage: $0 --config <config_name> [--num-nodes <num_nodes>]
+         [--report-dir <report_dir>] [--timeout <timeout>]
+         [--no-confirm] [--help]
+Options:
+  --config <config_name>    (Required) Path to the configuration file.
+  --environment             (Optional) Path to the environment, default to `~/.edf/multimodal.toml`.
+  --experiment-name <name>  (Optional) Name of the experiment. Default is derived from the date and time.
+  --num-nodes <num_nodes>   (Optional) Number of nodes to use. If not provided, the user will be prompted.
+  --report-dir <report_dir> (Optional) Directory to save reports. Default is './reports/verl'.
+  --timeout <timeout>       (Optional) Job timeout in HH:MM:SS format. Default is '11:59:00'.
+  --no-confirm              (Optional) If set, skips the confirmation prompt before job submission.
+  --help                    (Optional) Display this help message and exit.
+EOF
+)
+
+# Default values
+CONFIG_NAME=""
+NUM_NODES=""
+REPORT_DIR=""
+NO_CONFIRM=""
+ENVIRONMENT="$HOME/.edf/multimodal.toml"
+TIMEOUT="11:59:00"
+EXPERIMENT_NAME="verl-$(date +%Y%m%d-%H%M%S)"
+
+# Parse command line arguments
+while [[ "$#" -gt 0 ]]; do
+    key="$1"
+    case $key in
+        --config)
+            CONFIG_NAME="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --experiment-name)
+            EXPERIMENT_NAME="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --report-dir)
+            REPORT_DIR="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --environment)
+            ENVIRONMENT="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --num-nodes)
+            NUM_NODES="$2"
+            if ! [[ "$NUM_NODES" =~ ^[0-9]+$ ]]; then
+                echo "Error: --num-nodes must be an integer."
+                echo "$USAGE_STRING"
+                exit 1
+            fi
+            shift # past argument
+            shift # past value
+            ;;
+        --timeout)
+            TIMEOUT="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --no-confirm)
+            NO_CONFIRM="1"
+            shift # past argument
+            ;;
+        --help)
+            echo $PURPOSE_STRING
+            echo "$USAGE_STRING"
+            exit 0
+            ;;
+        *)
+        echo "Unknown parameter passed: $1"
+        echo "$USAGE_STRING"
+        exit 1
+        ;;
+    esac
+done
+
+# Check the config name is provided
+if [ -z "$CONFIG_NAME" ]; then
+    echo "Error: --config <config_name> is required."
+    echo "$USAGE_STRING"
+    exit 1
+fi
+CONFIG_NAME="$(realpath "$CONFIG_NAME")"
+
+# If the num-nodes is not provided, ask the user
+if [ -z "$NUM_NODES" ]; then
+    read -p "Enter the number of nodes to use: " NUM_NODES
+    if ! [[ "$NUM_NODES" =~ ^[0-9]+$ ]]; then
+        echo "Error: --num-nodes must be an integer."
+        exit 1
+    fi
+fi
+
+# Retrieve the script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_DIR="$(realpath $(dirname "$SCRIPT_DIR"))"
+
+# If report dir is absolute path, use it directly; if relative, make it relative to base dir
+if [[ "$REPORT_DIR" = /* ]]; then
+    REPORT_DIR="$REPORT_DIR"
+else
+    REPORT_DIR="$BASE_DIR/${REPORT_DIR:-reports/verl}"
+fi
+mkdir -p "$REPORT_DIR"
+
+REPORT_STDOUT_FILE="$REPORT_DIR/verl-$(date +%Y%m%d-%H%M%S)-%j.out"
+REPORT_STDERR_FILE="$REPORT_DIR/verl-$(date +%Y%m%d-%H%M%S)-%j.err"
+
+# Display summary of parameters
+echo ""
+echo "==================================="
+echo "Configuration Summary:"
+echo "  Config file:        $CONFIG_NAME"
+echo "  Environment file:   $ENVIRONMENT"
+echo "  Experiment name:    $EXPERIMENT_NAME"
+echo "  Number of nodes:    $NUM_NODES"
+echo "  Report directory:   $REPORT_DIR"
+echo "  Stdout file:        $REPORT_STDOUT_FILE"
+echo "  Stderr file:        $REPORT_STDERR_FILE"
+echo "  Timeout:            $TIMEOUT"
+echo "==================================="
+echo ""
+
+# --------------------------------
+# Prepare and execute the sbatch command
+# --------------------------------
+cmd="sbatch \
+--job-name=$EXPERIMENT_NAME \
+--output=$REPORT_STDOUT_FILE \
+--error=$REPORT_STDERR_FILE \
+--nodes=$NUM_NODES \
+--time=$TIMEOUT \
+--ntasks-per-node=1 \
+--cpus-per-task=280 \
+--gpus-per-node=4 \
+--partition=normal \
+--mem=380G \
+-A a127 \
+--environment=$ENVIRONMENT \
+--export=ALL,SCRIPT_DIR=$SCRIPT_DIR \
+\
+${SCRIPT_DIR}/sbatch_ray_launcher.sh \
+mm verl \
+-c \"$CONFIG_NAME\" \
++trainer.nnodes=$NUM_NODES \
++trainer.n_gpus_per_node=4 \
++trainer.experiment_name=$EXPERIMENT_NAME \
+"
+echo "$cmd"
+
+# Confirm with the user before proceeding
+if [ -z "$NO_CONFIRM" ]; then
+    read -p "Proceed with these settings? (y/n): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "Aborting."
+        exit 0
+    fi
+fi
+
+# Execute the command
+$cmd
+
+
+
