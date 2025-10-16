@@ -154,7 +154,7 @@ cmd="sbatch \
 --mem=380G \
 -A a127 \
 --environment=$ENVIRONMENT \
---export=ALL,SCRIPT_DIR=$SCRIPT_DIR \
+--export=SCRIPT_DIR=$SCRIPT_DIR,REPORT_STDOUT_FILE=$REPORT_STDOUT_FILE,REPORT_STDERR_FILE=$REPORT_STDERR_FILE \
 \
 ${SCRIPT_DIR}/sbatch_ray_launcher.sh \
 mm verl \

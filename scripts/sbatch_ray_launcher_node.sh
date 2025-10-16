@@ -1,25 +1,23 @@
 #!/bin/bash
 
 # Fail if any command fails
-set -e
-
-# Installing required dependencies
-pip install pynvml
-pip install . 
-pip install third-party/verl
-
 echo Number of nodes: $SLURM_NNODES
 echo Node list: $SLURM_NODELIST
 echo Number of tasks: $SLURM_NTASKS
 echo CPUs per task: $SLURM_CPUS_PER_TASK
 echo GPUs per node: $SLURM_GPUS_ON_NODE
 echo Memory per node: $SLURM_MEM_PER_NODE
+echo "Python Version: $(python --version)"
+echo "Python path: $(python -c 'import sys; print(sys.executable)')"
+echo "Ray path: $(which ray)"
+echo "Ray path: $(which ray)" 1>&2
 echo Working directory: $(pwd)
+set -e
 
 # Start ray HEAD node
 if [[ $SLURM_NODEID -eq 0 ]]; then
     echo "Starting Ray HEAD node on $(hostname)"
-    ray start \
+    python -m ray start \
         --head \
         --port=6379 \
         --node-ip-address=$(hostname -i) \
@@ -36,7 +34,7 @@ else
 
     # Start ray WORKER nodes
     echo "Starting Ray WORKER node on $(hostname)"
-    ray start \
+    python -m ray start \
         --address=$(scontrol show hostnames $SLURM_NODELIST | head -n 1):6379 \
         --node-ip-address=$(hostname -i) \
         --num-cpus=$SLURM_CPUS_PER_TASK \

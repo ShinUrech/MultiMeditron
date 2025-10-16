@@ -14,12 +14,33 @@ echo "CPUs per Task: $SLURM_CPUS_PER_TASK"
 echo "CPUs on Node: $SLURM_CPUS_ON_NODE"
 echo "GPUs per Node: $SLURM_GPUS_ON_NODE"
 echo "Memory per Node: $SLURM_MEM_PER_NODE"
+echo "Python Version: $(python --version)"
+echo "Python path: $(python -c 'import sys; print(sys.executable)')"
+echo "Ray path: $(which ray)"
 echo "Working Directory: $(pwd)"
 echo "Arguments: $@"
+set -e
+
+# Installing required dependencies
+pip install pynvml
+pip install ray
+pip install . 
+pip install third-party/verl
+echo "Ray path: $(which ray)"
+
+# Determine the stdout/stderr based on the CURRENT stdout stderr of this sbatch script
+REPORT_STDOUT_FILE="${REPORT_STDOUT_FILE:-$SLURM_JOB_ID.out}"
+REPORT_STDERR_FILE="${REPORT_STDERR_FILE:-$SLURM_JOB_ID.err}"
+
+REPORT_STDOUT_FILE="${REPORT_STDOUT_FILE%.out}-%t.out"
+REPORT_STDERR_FILE="${REPORT_STDERR_FILE%.err}-%t.err"
+
 
 # Launch the Ray cluster using sbatch_ray_launcher_node.sh on multiple nodes
 srun \
     --chdir=$PWD \
+    --output=$REPORT_STDOUT_FILE \
+    --error=$REPORT_STDERR_FILE \
     "$SCRIPT_DIR/sbatch_ray_launcher_node.sh" $@
 
 echo "Ending job on $(date)"
