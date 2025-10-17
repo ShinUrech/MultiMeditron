@@ -109,8 +109,7 @@ class ImageProcessor(BaseModalityProcessor):
                     indexing="ij"
                 ),
                 dim=-1
-            )
-        
+            ).reshape(self._num_patches_per_entry, 2)  # (num_patches, 2)
 
         return processed_modality
 

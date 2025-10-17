@@ -157,7 +157,7 @@ class DataCollatorForMultimodal(DataCollatorMixin):
 
         if self.use_2d_position_ids:
             # Create 2D position ids (batch_size, seq_length, 2)
-            position_ids = position_ids.unsqueeze(-1).repeat(-1, -1, 2)
+            position_ids = position_ids.unsqueeze(-1).repeat(1, 1, 2)
 
             # Iterate over each modality and optionally override position_ids if required.
             for batch_idx, sample in enumerate(features):
@@ -176,11 +176,8 @@ class DataCollatorForMultimodal(DataCollatorMixin):
                                 f"Expected ({token_range[1] - token_range[0]}, 2), got {modality_position_ids.shape}."
                             )
                         
-                        old_last_position_ids = position_ids[batch_idx, token_range[0] - 1, :] if token_range[0] > 0 else torch.tensor([0, 0]).long().to(position_ids.device)
-
-                        modality_position_ids = modality_position_ids.to(position_ids.device)
+                        old_last_position_ids = position_ids[batch_idx, token_range[1] - 1, :].clone() if token_range[0] > 0 else torch.tensor([0, 0]).long()
                         modality_position_ids += position_ids[batch_idx, token_range[0], :].unsqueeze(0) # [1, 2] because of broadcasting
-
                         next_last_position_ids = modality_position_ids[-1, :].max().unsqueeze(0).expand(2) # [2]
 
                         position_ids[batch_idx, token_range[0]:token_range[1], :] = modality_position_ids
