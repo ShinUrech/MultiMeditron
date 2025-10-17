@@ -53,7 +53,7 @@ ENV PATH="/opt/conda/envs/py312/bin:$PATH"
 ENV TRITON_PTXAS_PATH="/usr/local/cuda/bin/ptxas"
 
 RUN pip3 install --upgrade pip && \
-    pip3 install torch --index-url https://download.pytorch.org/whl/cu129
+    pip3 install "torch==2.8.0" --index-url https://download.pytorch.org/whl/cu129
 RUN pip3 install --upgrade pip && \
     pip3 install \
       requests ninja pytest numpy scipy build nvidia-ml-py cuda-python einops \
@@ -135,13 +135,14 @@ RUN pip3 install --upgrade pip && pip3 install -U \
 # This variable has been found through trial and errors, increase at you
 # own risk. In case of an emergency exists are located at the front and back of
 # the airplane.
+# !! Keep the version of `sgl-kernel` in sync with `sglang` below !!
 ENV MAX_JOBS=8
 RUN pip3 install --upgrade pip && pip3 install -U --no-build-isolation --use-pep517 \
         "flash-attn==2.8.3"
 RUN pip3 install --upgrade pip && pip3 install -U \
         nvidia-ml-py flashinfer-python
 RUN pip3 install --upgrade pip && pip3 install -v -U --no-build-isolation \
-        "sglang[test]==0.5.2" sgl_kernel
+        "sglang[test]==0.5.2" "sgl-kernel==0.3.15"
 RUN pip3 uninstall -y pynvml datasets && \
     pip3 install datasets
 

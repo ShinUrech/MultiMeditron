@@ -2,7 +2,6 @@ hydra:
   searchpath:
     - pkg://multimeditron.config
     - pkg://verl.trainer.config
-    - ./
 
 defaults:
   - verl_trainer
@@ -11,6 +10,8 @@ defaults:
   - _self_
 
 data:
+  max_prompt_length: 2048
+  max_response_length: 16384
   return_raw_chat: true
   train_files:
     - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd.parquet
@@ -22,9 +23,12 @@ data:
 
 actor_rollout_ref:
   rollout:
+    max_num_batched_tokens: 16384
+    n: 128
+    max_num_seqs: 256
     multi_turn:
       enable: true
-      max_tool_response_length: 2048
+      max_tool_response_length: 4096
       max_assistant_turns: 5
       tokenization_sanity_check_mode: strict
       tool_config_path: /users/gboye/MultiMeditron/config/rl/grpo/tools.yaml

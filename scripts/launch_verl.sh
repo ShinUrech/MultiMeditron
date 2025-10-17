@@ -158,10 +158,10 @@ cmd="sbatch \
 \
 ${SCRIPT_DIR}/sbatch_ray_launcher.sh \
 mm verl \
--c \"$CONFIG_NAME\" \
-+trainer.nnodes=$NUM_NODES \
-+trainer.n_gpus_per_node=4 \
-+trainer.experiment_name=$EXPERIMENT_NAME \
+-c $CONFIG_NAME \
+trainer.nnodes=$NUM_NODES \
+trainer.n_gpus_per_node=4 \
+trainer.experiment_name=$EXPERIMENT_NAME \
 "
 echo "$cmd"
 

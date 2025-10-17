@@ -1,41 +1,58 @@
 #!/bin/bash
 
 # Fail if any command fails
-echo Number of nodes: $SLURM_NNODES
-echo Node list: $SLURM_NODELIST
-echo Number of tasks: $SLURM_NTASKS
-echo CPUs per task: $SLURM_CPUS_PER_TASK
-echo GPUs per node: $SLURM_GPUS_ON_NODE
-echo Memory per node: $SLURM_MEM_PER_NODE
+set -e
+TMPDIR=$(mktemp -d)
+
+# Install pip requirements on each node
+pip install pynvml
+pip install ray
+pip install --no-cache-dir -e .
+pip install --no-cache-dir -e third-party/verl
+# cp -r . "$TMPDIR/pkg"
+# pip install -e "$TMPDIR/pkg"
+# pip install -e "$TMPDIR/pkg/third-party/verl"
+# rm -rf "$TMPDIR"
+
+# Summary
+echo "Number of nodes: $SLURM_NNODES"
+echo "Node list: $SLURM_NODELIST"
+echo "Number of tasks: $SLURM_NTASKS"
+echo "CPUs per task: $SLURM_CPUS_PER_TASK"
+echo "GPUs per node: $SLURM_GPUS_ON_NODE"
+echo "Memory per node: $SLURM_MEM_PER_NODE"
 echo "Python Version: $(python --version)"
 echo "Python path: $(python -c 'import sys; print(sys.executable)')"
 echo "Ray path: $(which ray)"
-echo "Ray path: $(which ray)" 1>&2
-echo Working directory: $(pwd)
-set -e
+echo "Working directory: $(pwd)"
+echo "Environment variables: "
 
 # Start ray HEAD node
 if [[ $SLURM_NODEID -eq 0 ]]; then
     echo "Starting Ray HEAD node on $(hostname)"
-    python -m ray start \
+    ray start \
         --head \
         --port=6379 \
+        --log-color=false \
         --node-ip-address=$(hostname -i) \
         --num-cpus=$SLURM_CPUS_PER_TASK \
         --num-gpus=$SLURM_GPUS_ON_NODE \
         --include-dashboard=true \
-        --dashboard-host="0.0.0.0"
+        --dashboard-host="0.0.0.0" \
+        --dashboard-port=8265
 
     # Await for the head node to initialize
-    sleep 20
+    sleep 30
 else
     # Sleep to ensure the head node starts before workers try to connect
-    sleep 5
+    sleep 6
 
     # Start ray WORKER nodes
     echo "Starting Ray WORKER node on $(hostname)"
-    python -m ray start \
+    ray start \
         --address=$(scontrol show hostnames $SLURM_NODELIST | head -n 1):6379 \
+        --block \
+        --log-color=false \
         --node-ip-address=$(hostname -i) \
         --num-cpus=$SLURM_CPUS_PER_TASK \
         --num-gpus=$SLURM_GPUS_ON_NODE
@@ -46,4 +63,5 @@ fi
 ray status
 
 echo "Running training script on $(hostname)"
-$1 # Execute the training script passed as an argument
+echo "Running command: $@"
+$@ # Execute the training script passed as an argument

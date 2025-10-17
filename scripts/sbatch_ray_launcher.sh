@@ -1,8 +1,13 @@
 #!/bin/bash
 
 # Set working directory to the directory where the Slurm script is located
-
 echo "Starting job on $(date)"
+
+# Unset some environment variables that might interfere with Ray
+# those variables are sets for some reason on the CSCS cluster, probably due to a misconfiguration
+unset ${!ROCR_*}
+unset {HTTP,HTTPS,FTP}_PROXY
+unset {http,https,ftp}_proxy
 
 # Echo information about the job
 echo "Job ID: $SLURM_JOB_ID"
@@ -21,26 +26,16 @@ echo "Working Directory: $(pwd)"
 echo "Arguments: $@"
 set -e
 
-# Installing required dependencies
-pip install pynvml
-pip install ray
-pip install . 
-pip install third-party/verl
-echo "Ray path: $(which ray)"
-
 # Determine the stdout/stderr based on the CURRENT stdout stderr of this sbatch script
 REPORT_STDOUT_FILE="${REPORT_STDOUT_FILE:-$SLURM_JOB_ID.out}"
-REPORT_STDERR_FILE="${REPORT_STDERR_FILE:-$SLURM_JOB_ID.err}"
-
-REPORT_STDOUT_FILE="${REPORT_STDOUT_FILE%.out}-%t.out"
-REPORT_STDERR_FILE="${REPORT_STDERR_FILE%.err}-%t.err"
-
+REPORT_STDOUT_FILE="${REPORT_STDOUT_FILE%.out}-%t.log"
 
 # Launch the Ray cluster using sbatch_ray_launcher_node.sh on multiple nodes
 srun \
     --chdir=$PWD \
     --output=$REPORT_STDOUT_FILE \
-    --error=$REPORT_STDERR_FILE \
+    --error=$REPORT_STDOUT_FILE \
+    --export=ALL \
     "$SCRIPT_DIR/sbatch_ray_launcher_node.sh" $@
 
 echo "Ending job on $(date)"

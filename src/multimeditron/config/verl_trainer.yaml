@@ -53,6 +53,8 @@ actor_rollout_ref:
     use_shm: false
     trust_remote_code: ${trust_remote_code}
   rollout:
+    prompt_length: ${data.max_prompt_length}
+    response_length: ${data.max_response_length}
     max_model_len: null
     max_num_batched_tokens: 8192
     max_num_seqs: 1024
