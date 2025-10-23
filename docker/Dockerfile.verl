@@ -20,37 +20,58 @@
 #  - https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-25-08.html
 #  - https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch
 # FROM nvcr.io/nvidia/pytorch:25.06-py3 AS base
-FROM nvidia/cuda:12.9.0-devel-ubuntu24.04 AS base
+# FROM nvidia/cuda:12.9.0-devel-ubuntu24.04 AS base
+FROM docker.io/nvidia/cuda:12.9.1-devel-rockylinux9 AS base
+ARG PYTHON_VERSION=3.13.9
 
 # Enable caching for `apt` packages in Docker.
 # https://docs.docker.com/engine/reference/builder/#run---mounttypecache
-RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
-    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > \
-    /etc/apt/apt.conf.d/keep-cache
+# RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
+#     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > \
 
-ARG DEBIAN_FRONTEND=noninteractive
-# sed is only used as a hack to remove comments from the file apt.txt.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        build-essential ca-certificates curl git htop \
-        btop netcat-traditional openssh-server openssl sudo tmux  \
-        tree vim zsh ffmpeg wget \
-        linux-tools-common linux-tools-generic python3 \
-        python3-pip python3-venv && \
-    rm -rf /var/lib/apt/lists/*
+# Base OS packages for Rocky Linux 9 using dnf
+RUN dnf -y install epel-release && \
+    crb enable && \
+    dnf makecache
+RUN dnf update -y && \
+    dnf install -y \
+        gcc gcc-c++ make ca-certificates git htop \
+        nmap-ncat openssl-devel tmux tree vim-enhanced \
+        zsh wget kernel-tools kernel-tools-libs \
+        bzip2-devel libffi-devel zlib-devel xz && \
+    update-ca-trust force-enable && \
+    update-ca-trust extract
+
+# Install python PYTHON_VERSION on Rocky Linux 9
+RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz && \
+    tar -xf Python-${PYTHON_VERSION}.tar.xz && \
+    cd Python-${PYTHON_VERSION} && \
+    ./configure --enable-optimizations && \
+    make -j$(nproc) && \
+    make altinstall && \
+    cd .. && rm -rf Python-${PYTHON_VERSION} Python-${PYTHON_VERSION}.tar.xz
+
+# Install pip and setup python symlinks
+RUN /bin/bash -c "\
+    ln -sf /usr/local/bin/python$(echo ${PYTHON_VERSION} | cut -d. -f1,2) /usr/bin/python3; \
+    ln -sf /usr/local/bin/python$(echo ${PYTHON_VERSION} | cut -d. -f1,2) /usr/bin/python; \
+    python3 -m ensurepip; \
+    ln -sf $(which pip$(echo ${PYTHON_VERSION} | cut -d. -f1,2)) /usr/bin/pip3; \
+    ln -sf $(which pip$(echo ${PYTHON_VERSION} | cut -d. -f1,2)) /usr/bin/pip; \
+    pip install --upgrade pip setuptools wheel;"
 
 # Install miniforge as system-wide python package are holy in ubuntu
-RUN mkdir /tmp/install
-WORKDIR /tmp/install
-RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && \
-    bash Miniforge3.sh -b -p /opt/conda && \
-    /opt/conda/bin/conda create -n py312 python=3.12
-WORKDIR /
-RUN rm -rf /tmp/install
-RUN echo "source activate py312" >> ~/.bashrc
-ENV PATH="/opt/conda/bin:$PATH"
-ENV PATH="/opt/conda/envs/py312/bin:$PATH"
-ENV TRITON_PTXAS_PATH="/usr/local/cuda/bin/ptxas"
+# RUN mkdir /tmp/install
+# WORKDIR /tmp/install
+# RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && \
+#     bash Miniforge3.sh -b -p /opt/conda && \
+#     /opt/conda/bin/conda create -n py312 python=3.12
+# WORKDIR /
+# RUN rm -rf /tmp/install
+# RUN echo "source activate py312" >> ~/.bashrc
+# ENV PATH="/opt/conda/bin:$PATH"
+# ENV PATH="/opt/conda/envs/py312/bin:$PATH"
+# ENV TRITON_PTXAS_PATH="/usr/local/cuda/bin/ptxas"
 
 RUN pip3 install --upgrade pip && \
     pip3 install "torch==2.8.0" --index-url https://download.pytorch.org/whl/cu129
@@ -59,21 +80,19 @@ RUN pip3 install --upgrade pip && \
       requests ninja pytest numpy scipy build nvidia-ml-py cuda-python einops \
       nvidia-nvshmem-cu12 nvidia-cutlass-dsl 'apache-tvm-ffi>=0.1.0b6' \
       'nvidia-cudnn-frontend>=1.13.0' 'nvidia-cudnn-cu12>=9.11.0.98'
-RUN conda install -n py312 -y mpi4py
+
+# torch==2.8.0 compatibly with torchao =0.13.0 (at least <0.14)
+RUN pip3 install --upgrade pip && \
+    pip3 install "torchao==0.13.0"
 
 # Install nsjail runtime dependencies in base image
-RUN apt-get update -y && \
-    apt-get install -y libc6 libstdc++6 libprotobuf32 libnl-route-3-200 && \
-    rm -rf /var/lib/apt/lists/*
+RUN dnf install -y glibc libstdc++ protobuf libnl3
 
 ########################################################################
 # Build nsjail in separated image
 FROM base AS build-nsjail
 
-RUN apt-get update -y && \
-    apt-get install -y \
-       autoconf bison flex gcc g++ libprotobuf-dev \
-       libnl-route-3-dev libtool make pkg-config protobuf-compiler git
+RUN dnf install -y autoconf bison flex gcc gcc-c++ libtool make pkgconfig protobuf-devel git libnl3-devel
 RUN git clone https://github.com/google/nsjail.git --depth 1 -b 3.4 /nsjail && \
     cd /nsjail && make clean && make
 
@@ -102,35 +121,77 @@ COPY --from=build-nsjail /nsjail/nsjail /bin
 # RUN pip freeze > ${DEPENDENCIES_DIR}/requirements-freeze-final.txt
 # RUN pip list --format freeze > ${DEPENDENCIES_DIR}/requirements-list-final.txt
 
-# Shell configuration.
+# --- Shell configuration (rizzed ZSH setup) ---
 ENV ZSH_ENHANCE_DIR=/etc/zsh/enhance
 ARG PURE_PATH=${ZSH_ENHANCE_DIR}/pure
 ARG ZSHA_PATH=${ZSH_ENHANCE_DIR}/zsh-autosuggestions
 ARG ZSHS_PATH=${ZSH_ENHANCE_DIR}/zsh-syntax-highlighting
+
 COPY --from=git-pure /opt/zsh/pure ${PURE_PATH}
 COPY --from=git-pure /opt/zsh/zsh-autosuggestions ${ZSHA_PATH}
 COPY --from=git-pure /opt/zsh/zsh-syntax-highlighting ${ZSHS_PATH}
-RUN {   echo "fpath+=${PURE_PATH}"; \
-        echo "autoload -Uz promptinit; promptinit"; \
-        echo "prompt pure"; \
+
+RUN dnf install -y cargo bat && \
+    git clone https://github.com/eza-community/eza.git /eza && \
+    cd /eza && \
+    cargo build --release && \
+    cp /eza/target/release/eza /usr/bin/eza && \
+    rm -rf /eza
+RUN sed -i 's|/bin/bash|/usr/bin/zsh|' /etc/passwd && \
+    echo "/usr/bin/zsh" | tee -a /etc/shells
+
+RUN {   echo "# =================================================="; \
+        echo "# 🌈 Enhanced ZSH Configuration (Rocky Linux 9)"; \
+        echo "# =================================================="; \
+        echo "export TERM=xterm-256color"; \
+        echo "autoload -Uz compinit promptinit colors vcs_info"; \
+        echo "compinit"; \
+        echo "promptinit"; \
+        echo "colors"; \
+        echo ""; \
+        echo "# Plugins"; \
+        echo "fpath+=${PURE_PATH}"; \
         echo "source ${ZSHA_PATH}/zsh-autosuggestions.zsh"; \
         echo "source ${ZSHS_PATH}/zsh-syntax-highlighting.zsh"; \
-        echo "alias ls='ls --color=auto'"; \
-        echo "alias ll='ls -lh'"; \
+        echo ""; \
+        echo "# Prompt setup (Pure + colors)"; \
+        echo "promptinit"; \
+        echo "prompt pure"; \
+        echo "zstyle ':prompt:pure:prompt:success' color green"; \
+        echo "zstyle ':prompt:pure:path' color cyan"; \
+        echo "zstyle ':prompt:pure:user' color blue"; \
+        echo ""; \
+        echo "# Autosuggestions color"; \
+        echo "ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'"; \
+        echo ""; \
+        echo "# Syntax highlighting tweaks"; \
+        echo "ZSH_HIGHLIGHT_HIGHLIGHTERS=(main brackets pattern cursor)"; \
+        echo "ZSH_HIGHLIGHT_STYLES[command]='fg=green,bold'"; \
+        echo "ZSH_HIGHLIGHT_STYLES[builtin]='fg=cyan'"; \
+        echo "ZSH_HIGHLIGHT_STYLES[path]='fg=blue,underline'"; \
+        echo "ZSH_HIGHLIGHT_STYLES[alias]='fg=magenta'"; \
+        echo ""; \
+        echo "# Aliases with color"; \
+        echo "alias ls='eza --color=always --icons'"; \
+        echo "alias ll='eza -lh --color=always --icons'"; \
+        echo "alias la='eza -lha --color=always --icons'"; \
+        echo "alias cat='bat --style=plain --paging=never'"; \
+        echo "alias grep='grep --color=auto'"; \
         echo "alias update-env-file='source \${PROJECT_ROOT_AT}/installation/docker-amd64-cuda/update-env-file.sh'"; \
+        echo ""; \
     } >> /etc/zsh/zshrc
-
+    
 # Installing required dependencies
 RUN pip3 install --upgrade pip && pip3 install -U \
-      ninja accelerate datasets "transformers==4.56.2" \
-      codetiming dill hydra-core pandas wandb      \
-      "pyarrow>=15.0.0" pybind11 pylatexenc        \
-      pybase64 mooncake-transfer-engine zmq        \
-      uvloop fastapi openai partial_json_parser    \
-      sentencepiece compressed_tensors msgspec     \
-      nest_asyncio torchao xgrammar                \
-      uvicorn python-multipart torch_memory_saver  \
-      "debugpy>=1.8.0"
+    ninja accelerate datasets "transformers==4.56.2" \
+    codetiming dill hydra-core pandas wandb      \
+    "pyarrow>=15.0.0" pybind11 pylatexenc        \
+    pybase64 mooncake-transfer-engine zmq        \
+    "uvloop==0.21.0" fastapi openai partial_json_parser    \
+    sentencepiece compressed_tensors msgspec     \
+    nest_asyncio xgrammar uvicorn                \
+    python-multipart torch_memory_saver          \
+    "debugpy>=1.8.0" ray[serve]
 
 # This variable has been found through trial and errors, increase at you
 # own risk. In case of an emergency exists are located at the front and back of
@@ -140,12 +201,11 @@ ENV MAX_JOBS=8
 RUN pip3 install --upgrade pip && pip3 install -U --no-build-isolation --use-pep517 \
         "flash-attn==2.8.3"
 RUN pip3 install --upgrade pip && pip3 install -U \
-        nvidia-ml-py flashinfer-python
+         nvidia-ml-py flashinfer-python
 RUN pip3 install --upgrade pip && pip3 install -v -U --no-build-isolation \
         "sglang[test]==0.5.2" "sgl-kernel==0.3.15"
 RUN pip3 uninstall -y pynvml datasets && \
     pip3 install datasets
-
 
 # Add code tunnel for remote code development directly on the docker image
 RUN mkdir -p /tmp/code
@@ -156,10 +216,33 @@ RUN curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alp
 WORKDIR /
 RUN rm -rf /tmp/code
 
+# For some obscure reason curl, git cannot retrive ssl certificate with
+# the following environment variable
+RUN echo 'export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem' > /etc/profile.d/ssl_cert.sh && \
+    echo 'export GIT_SSL_CAINFO=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem' >> /etc/profile.d/ssl_cert.sh && \
+    chmod +x /etc/profile.d/ssl_cert.sh
+
+# Install numactl
+# Also install libfabric and libnccl-net-ofi for better performance on multi-node
+# E2S instances with NVLink and RoCE
+# Check sha 256 commnad: `sha256sum aws-ofi-nccl-1.17.0.tar.gz`
+RUN dnf install -y numactl libfabric-devel hwloc-devel libibverbs-devel
+RUN wget https://github.com/aws/aws-ofi-nccl/releases/download/v1.17.0/aws-ofi-nccl-1.17.0.tar.gz -O /tmp/aws-ofi-nccl-1.17.0.tar.gz && \
+    echo "61993a349abd02a92c2d8f8a4ebc0d348a32db7c9ebccd1d41bca0d2b692e0d566149d479f578c0f07ebf6105c980abb27ef6a421cc9b1117d9c9138321897ff  /tmp/aws-ofi-nccl-1.17.0.tar.gz" | sha512sum -c - && \
+    tar -xvf /tmp/aws-ofi-nccl-1.17.0.tar.gz -C /tmp && \
+    cd /tmp/aws-ofi-nccl-1.17.0 && \
+    ./configure --with-cuda=/usr/local/cuda --exec-prefix=/usr && \
+    make && \
+    make install && \
+    cd / && rm -rf /tmp/aws-ofi-nccl-1.17.0 /tmp/aws-ofi-nccl-1.17.0.tar.gz
+
 # Cleanup duty to make the docker image as lightweight as possible
-RUN rm -rf /var/lib/apt/lists/* && \
-    apt-get clean && \
+RUN dnf clean all && \
+    rm -rf /var/cache/dnf && \
     pip cache purge
 
 # Entrypoint command (zsh)
-CMD ["/bin/zsh"]
+# CMD ["/bin/bash"]
+ENTRYPOINT ["/usr/bin/zsh"]
+
+# Be sure to run it with --ipc=host if issue with no place left on device
