@@ -2,17 +2,13 @@
 
 # Fail if any command fails
 set -e
-TMPDIR=$(mktemp -d)
 
-# Install pip requirements on each node
-pip install pynvml
-pip install ray
-pip install --no-cache-dir -e .
-pip install --no-cache-dir -e third-party/verl
-# cp -r . "$TMPDIR/pkg"
-# pip install -e "$TMPDIR/pkg"
-# pip install -e "$TMPDIR/pkg/third-party/verl"
-# rm -rf "$TMPDIR"
+unset ROCR_VISIBLE_DEVICES # For some obscure reason this is set by CSCS environemtn
+unset {HTTP,HTTPS,FTP,NO}_PROXY # Same here, having those variable set (even empty) can mess up with some tools (looking at you curl)
+unset {http,https,ftp,no}_proxy # Same here, having those variable set (even empty) can mess up with some tools (looking at you curl)
+
+echo "Activating virtual environment at $VENV_DIR"
+source "$VENV_DIR/bin/activate"
 
 # Summary
 echo "Number of nodes: $SLURM_NNODES"
@@ -41,11 +37,11 @@ if [[ $SLURM_NODEID -eq 0 ]]; then
         --dashboard-host="0.0.0.0" \
         --dashboard-port=8265
 
-    # Await for the head node to initialize
-    sleep 30
+    # Await for the head node to initialize (await for 1 whole minues)
+    sleep 20 
 else
     # Sleep to ensure the head node starts before workers try to connect
-    sleep 6
+    sleep 10
 
     # Start ray WORKER nodes
     echo "Starting Ray WORKER node on $(hostname)"
@@ -65,3 +61,6 @@ ray status
 echo "Running training script on $(hostname)"
 echo "Running command: $@"
 $@ # Execute the training script passed as an argument
+
+# Finally stop the ray cluster (this should also stop all of the worker noeds)
+ray stop

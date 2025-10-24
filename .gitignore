@@ -220,3 +220,6 @@ __marimo__/
 # Hide template files
 **/gitignored-*
 reports/* 
+
+# Remove core dumps
+**/core_nid*

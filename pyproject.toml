@@ -27,6 +27,7 @@ dependencies = [
     "transformers",
     "einops",
     "deepspeed",
+    "orjson",
     "accelerate",
     "hf_transfer",
     "wandb",

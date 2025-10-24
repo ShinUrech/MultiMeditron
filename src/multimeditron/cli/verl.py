@@ -6,6 +6,7 @@ import click
 import os
 import logging
 import ray
+import sys
 
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ def verl(ctx,
                     "NCCL_DEBUG": "INFO" if debug else "WARN",
                     "VLLM_LOGGING_LEVEL": "INFO" if debug else "ERROR",
                 },
+                "py_executable": sys.executable, # Use the same Python executable (notably for venvs)
             },
         }
 

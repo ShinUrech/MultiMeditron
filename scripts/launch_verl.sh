@@ -7,6 +7,7 @@
 
 # If run from an interactive shell, make sure that SLURM environment variables are not set
 unset ${!SLURM_*}
+set -e
 
 # Global, constants
 PURPOSE_STRING="Launch a SLURM job for training using Ray with VERL dependencies."
@@ -20,8 +21,10 @@ Options:
   --experiment-name <name>  (Optional) Name of the experiment. Default is derived from the date and time.
   --num-nodes <num_nodes>   (Optional) Number of nodes to use. If not provided, the user will be prompted.
   --report-dir <report_dir> (Optional) Directory to save reports. Default is './reports/verl'.
+  --venv-dir <venv_dir>     (Optional) Directory to store the virtual environment to. Default to './.venv'.
   --timeout <timeout>       (Optional) Job timeout in HH:MM:SS format. Default is '11:59:00'.
-  --no-confirm              (Optional) If set, skips the confirmation prompt before job submission.
+  --no-confirm              If set, skips the confirmation prompt before job submission.
+  --recreate-venv           If set, recreate the venv and rerun the install script.
   --help                    (Optional) Display this help message and exit.
 EOF
 )
@@ -31,6 +34,8 @@ CONFIG_NAME=""
 NUM_NODES=""
 REPORT_DIR=""
 NO_CONFIRM=""
+RECREATE_VENV=""
+VENV_DIR="./.venv"
 ENVIRONMENT="$HOME/.edf/multimodal.toml"
 TIMEOUT="11:59:00"
 EXPERIMENT_NAME="verl-$(date +%Y%m%d-%H%M%S)"
@@ -69,6 +74,11 @@ while [[ "$#" -gt 0 ]]; do
             shift # past argument
             shift # past value
             ;;
+        --venv-dir)
+            VENV_DIR="$2"
+            shift # past argument
+            shift # past value
+            ;;
         --timeout)
             TIMEOUT="$2"
             shift # past argument
@@ -76,6 +86,10 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --no-confirm)
             NO_CONFIRM="1"
+            shift # past argument
+            ;;
+        --recreate-venv)
+            RECREATE_VENV="1"
             shift # past argument
             ;;
         --help)
@@ -108,9 +122,24 @@ if [ -z "$NUM_NODES" ]; then
     fi
 fi
 
+# Check that the venv dir exists, if not create and install it
+if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
+    echo "Generating virtual environment for running the script at $VENV_DIR"
+    python -m venv \
+        --system-site-packages \
+        --symlinks \
+        $VENV_DIR
+    source ./.venv/bin/activate
+
+    pip install pynvml
+    pip install -e .
+    pip install -e third-party/verl
+fi
+
 # Retrieve the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(realpath $(dirname "$SCRIPT_DIR"))"
+VENV_DIR="$(realpath $VENV_DIR)"
 
 # If report dir is absolute path, use it directly; if relative, make it relative to base dir
 if [[ "$REPORT_DIR" = /* ]]; then
@@ -154,7 +183,7 @@ cmd="sbatch \
 --mem=380G \
 -A a127 \
 --environment=$ENVIRONMENT \
---export=SCRIPT_DIR=$SCRIPT_DIR,REPORT_STDOUT_FILE=$REPORT_STDOUT_FILE,REPORT_STDERR_FILE=$REPORT_STDERR_FILE \
+--export=SCRIPT_DIR=$SCRIPT_DIR,REPORT_STDOUT_FILE=$REPORT_STDOUT_FILE,REPORT_STDERR_FILE=$REPORT_STDERR_FILE,VENV_DIR=$VENV_DIR \
 \
 ${SCRIPT_DIR}/sbatch_ray_launcher.sh \
 mm verl \

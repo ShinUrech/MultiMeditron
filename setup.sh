@@ -20,10 +20,7 @@ if [[ $(id -u) == 30156 ]]; then
     tmux new-session -d -s "$SESSION_NAME"
 
     tmux split-window -v -t "$SESSION_NAME"
-    tmux send-keys -t "$SESSION_NAME":0.0 'bash' C-m
     tmux send-keys -t "$SESSION_NAME":0.0 'code tunnel --name=cluster-tunnel' C-m
-
-    tmux send-keys -t "$SESSION_NAME":0.1 'bash' C-m
     tmux send-keys -t "$SESSION_NAME":0.1 'pip install -e . && pip install -e third-party/verl/' C-m
 
     # Attach to the tmux session

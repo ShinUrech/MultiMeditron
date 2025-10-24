@@ -38,7 +38,13 @@ RUN dnf update -y && \
         gcc gcc-c++ make ca-certificates git htop \
         nmap-ncat openssl-devel tmux tree vim-enhanced \
         zsh wget kernel-tools kernel-tools-libs \
-        bzip2-devel libffi-devel zlib-devel xz && \
+        bzip2-devel libffi-devel zlib-devel \
+        xz-devel lzma ncurses-devel \
+        sqlite-devel tcl-devel libzstd-devel \ 
+        gdb glibc-devel libstdc++-devel \
+        readline-devel libzstd-devel bzip2-devel \
+        sqlite-libs libuuid-devel gdbm-libs \
+        perf expat-devel mpdecimal procps-ng tree fzf && \
     update-ca-trust force-enable && \
     update-ca-trust extract
 
@@ -59,19 +65,6 @@ RUN /bin/bash -c "\
     ln -sf $(which pip$(echo ${PYTHON_VERSION} | cut -d. -f1,2)) /usr/bin/pip3; \
     ln -sf $(which pip$(echo ${PYTHON_VERSION} | cut -d. -f1,2)) /usr/bin/pip; \
     pip install --upgrade pip setuptools wheel;"
-
-# Install miniforge as system-wide python package are holy in ubuntu
-# RUN mkdir /tmp/install
-# WORKDIR /tmp/install
-# RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && \
-#     bash Miniforge3.sh -b -p /opt/conda && \
-#     /opt/conda/bin/conda create -n py312 python=3.12
-# WORKDIR /
-# RUN rm -rf /tmp/install
-# RUN echo "source activate py312" >> ~/.bashrc
-# ENV PATH="/opt/conda/bin:$PATH"
-# ENV PATH="/opt/conda/envs/py312/bin:$PATH"
-# ENV TRITON_PTXAS_PATH="/usr/local/cuda/bin/ptxas"
 
 RUN pip3 install --upgrade pip && \
     pip3 install "torch==2.8.0" --index-url https://download.pytorch.org/whl/cu129
@@ -235,6 +228,9 @@ RUN wget https://github.com/aws/aws-ofi-nccl/releases/download/v1.17.0/aws-ofi-n
     make && \
     make install && \
     cd / && rm -rf /tmp/aws-ofi-nccl-1.17.0 /tmp/aws-ofi-nccl-1.17.0.tar.gz
+
+# Install other libraries we may depend on later
+RUN dnf install -y lzma bzip2 xz-devel
 
 # Cleanup duty to make the docker image as lightweight as possible
 RUN dnf clean all && \

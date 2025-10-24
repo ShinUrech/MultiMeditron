@@ -7,7 +7,8 @@ services:
   # path is not hardcoded like it is here.
   - name: nsjail-python-exec-pool
     python:
-      path: /opt/conda/envs/py312/bin/python3.12
+      # path: /opt/conda/envs/py312/bin/python3.12
+      path: /usr/local/bin/python3.13
     nsjail:
       path: /usr/bin/nsjail
       merged_stderr: true # merge stderr into stdout

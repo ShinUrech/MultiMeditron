@@ -8,6 +8,7 @@ echo "Starting job on $(date)"
 unset ${!ROCR_*}
 unset {HTTP,HTTPS,FTP}_PROXY
 unset {http,https,ftp}_proxy
+source "$VENV_DIR/bin/activate"
 
 # Echo information about the job
 echo "Job ID: $SLURM_JOB_ID"
@@ -19,6 +20,7 @@ echo "CPUs per Task: $SLURM_CPUS_PER_TASK"
 echo "CPUs on Node: $SLURM_CPUS_ON_NODE"
 echo "GPUs per Node: $SLURM_GPUS_ON_NODE"
 echo "Memory per Node: $SLURM_MEM_PER_NODE"
+echo "Virtual Environment: $VIRTUAL_ENV"
 echo "Python Version: $(python --version)"
 echo "Python path: $(python -c 'import sys; print(sys.executable)')"
 echo "Ray path: $(which ray)"
