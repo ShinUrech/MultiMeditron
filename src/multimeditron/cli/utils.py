@@ -23,7 +23,7 @@ def split_host_port(hostport: str, default_port: Optional[int] = None) -> Tuple[
 @main_cli.command("tokenizer_set_chat_template", epilog=EPILOG)
 @click.option("--output", "-o", type=click.Path(), required=True, help="Path to save the final tokenizer with overwritten chat template.")
 @click.option("--chat-template", "-t", type=click.Path(file_okay=True, exists=True), required=True, help="Path to the chat template file.")
-@click.option("--tokenizer-path", "-p", type=click.Path(exists=True), required=True, help="Path to the tokenizer to modify.")
+@click.option("--tokenizer-path", "-p", type=str, required=True, help="Path to the tokenizer to modify.")
 def set_chat_template(
     output: str,
     chat_template: str,
@@ -44,6 +44,9 @@ def set_chat_template(
     with open(chat_template, "r") as f:
         template_content = f.read()
     tokenizer.chat_template = template_content
+    if tokenizer.pad_token is None:
+        print("No pad token found, set pad token to eos token")
+        tokenizer.pad_token = tokenizer.eos_token
 
     logger.info(f"Saving modified tokenizer to {output}...")
     tokenizer.save_pretrained(output)

@@ -57,7 +57,7 @@ def preprocess_ds(ctx, config: str = None, verbose: bool = False, head: int = No
             logger.info(f"Loaded dataset from HuggingFace: {cfg.source.kwargs}")
 
         case "jsonl":
-            from multimeditron.model.jsonl_generator import JSONLGenerator
+            from multimeditron.utils.jsonl import JSONLGenerator
             from datasets import Dataset
 
             logger.info(f"Loaded dataset from JSONL file: {cfg.source.kwargs.path}")

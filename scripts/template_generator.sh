@@ -7,6 +7,7 @@ set -e
 # on the expected tool call format
 jinja2_template=$(cat << 'EOF'
 ; ============= Jinja2 Template for Chat Models =============
+{{- bos_token }}
 {%- if not date_string is defined %}
   {%- set date_string = "01 Oct 2025" %}
 {%- endif %}
@@ -89,8 +90,13 @@ jinja2_template=$(echo "$jinja2_template" | sed 's/^[ \t]*//')
 # Remove all literal new lines
 jinja2_template=$(echo "$jinja2_template" | tr -d '\n')
 
-# Escape all quotes and single quotes
-jinja2_template=$(echo "$jinja2_template" | sed 's/"/\\"/g')
+# Replace '\n' with actual new line characters
+jinja2_template=$(echo "$jinja2_template" | sed -E 's/([^\\])\\n/\1\n/g')
+jinja2_template=$(echo "$jinja2_template" | sed 's/\\\\n/\\n/g')
+echo "$jinja2_template" 
+
+# Replace '\n' with actual new line characters
+# jinja2_template=$(echo "$jinja2_template" | sed 's/[^\\]\\n/\n/g')
 
 # A small python snippet to test rendering the jinja2 template
 python_code=$(cat << 'PYTHON_EOF'
@@ -132,7 +138,7 @@ if [ "$#" -ne 1 ]; then
 
     echo "----- End of Rendered Template Preview -----"
 else
-    escaped=$(printf 'custom_chat_template: "%s"' "$jinja2_template" | sed -e 's/[\/&]/\\&/g')
-    printf '%s\n' "$escaped"
-    awk -v jinja2_template="$escaped" 'NR==1{$0=jinja2_template}1' $1 > tmpfile && mv tmpfile $1
+    # escaped=$(printf 'custom_chat_template: "%s"' "$jinja2_template" | sed -e 's/[\/&]/\\&/g')
+    # awk -v jinja2_template="$escaped" 'NR==1{$0=jinja2_template}1' $1 > tmpfile && mv tmpfile $1
+    echo "$jinja2_template" > $1
 fi

@@ -95,6 +95,3 @@ ray:
 
 # Global setting for trusting remote code when loading models
 trust_remote_code: false
-
-# Customized chat template for actor and ref models
-custom_chat_template: null

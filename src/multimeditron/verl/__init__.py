@@ -19,17 +19,15 @@ class TaskRunner:
 
         # Instantiate tokenizer
         print("Instantiating tokenizer...")
+        tokenizer_path = cfg.actor_rollout_ref.model.get("tokenizer_path", None)
+        if tokenizer_path is None:
+            tokenizer_path = cfg.actor_rollout_ref.model.path
+
         tokenizer = AutoTokenizer.from_pretrained(
-            cfg.actor_rollout_ref.model.path,
+            tokenizer_path,
             use_fast=True,
             trust_remote_code=trust_remote_code
         )
-        if tokenizer.pad_token is None:
-            print("No pad token found, set pad token to eos token")
-            tokenizer.pad_token = tokenizer.eos_token
-        if cfg.custom_chat_template is not None:
-            print(f"Using custom chat template: {cfg.custom_chat_template}")
-            tokenizer.chat_template = cfg.custom_chat_template
         
         # For each strategy, we would have different training loops
         # assert cfg.actor_rollout_ref.model.strategy == cfg.critic.model.strategy, "Currently only support same strategy for actor and critic"

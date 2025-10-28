@@ -10,6 +10,16 @@ unset {http,https,ftp,no}_proxy # Same here, having those variable set (even emp
 echo "Activating virtual environment at $VENV_DIR"
 source "$VENV_DIR/bin/activate"
 
+# Traveller be aware, beneath lies the sources of all evil,
+# What maketh the mighty nsjail to falter and succomb,
+# Is a poison made of bashisms and slurmisms,
+# A concoction so vile, that none who drinketh it,
+# Shall evermore be able to run their scripts as intended.
+# Beware traveller, and turn back now, lest ye be doomed forevermore.
+rm /usr/lib64/libnl-3.so.200 # Remove libnl-3 that is symlinked to the one overwritten by SLURM
+ln -s /usr/lib64/libnl-3.so.200.26.0 /usr/lib64/libnl-3.so.200 # Recreate symlink to the correct version
+echo "Libnl-3 sha afer fix: $(sha256sum /usr/lib64/libnl-3.so.200  | awk '{print substr($1,1,16)}'), should be '2f233046cabcd5e7'"
+
 # Summary
 echo "Number of nodes: $SLURM_NNODES"
 echo "Node list: $SLURM_NODELIST"

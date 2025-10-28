@@ -232,6 +232,9 @@ RUN wget https://github.com/aws/aws-ofi-nccl/releases/download/v1.17.0/aws-ofi-n
 # Install other libraries we may depend on later
 RUN dnf install -y lzma bzip2 xz-devel
 
+# This is hacky patch is to fix the libnl error occuring because slurm override our copy of libnl for some reason
+RUN cp /usr/lib64/libnl-3.so.200.26.0 /usr/lib64/libnl-3.so.200.26.0.copy
+
 # Cleanup duty to make the docker image as lightweight as possible
 RUN dnf clean all && \
     rm -rf /var/cache/dnf && \

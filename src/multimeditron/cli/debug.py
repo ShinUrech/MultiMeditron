@@ -54,12 +54,12 @@ def serve_nsjail_python(ctx, config: Optional[str] = None):
 
     if config is None:
         with initialize_config_dir(config_dir=CONFIG_PATH, version_base="1.2"):
-            cfg = compose(config_name="nsjail-python-exec-pool", overrides=ctx.args)
+            cfg = compose(config_name="nsjail-python-exec-pool", overrides=ctx.args).services[0]
     else:
         config_dir = os.path.dirname(os.path.abspath(config))
         config_name = os.path.basename(config)
         with initialize_config_dir(config_dir=config_dir, version_base="1.2"):
-            cfg = compose(config_name=config_name, overrides=ctx.args)
+            cfg = compose(config_name=config_name, overrides=ctx.args).services[0]
     
     # Start ray if not already running
     if not ray.is_initialized():
