@@ -129,7 +129,7 @@ if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
         --system-site-packages \
         --symlinks \
         $VENV_DIR
-    source ./.venv/bin/activate
+    source ./$VENV_DIR/bin/activate
 
     pip install pynvml
     pip install -e .
