@@ -2,15 +2,17 @@ hydra:
   searchpath:
     - pkg://multimeditron.config
     - pkg://verl.trainer.config
+    - model
 
 defaults:
   - verl_trainer
   - nsjail-python-exec-pool
+  - model/llama-3.1-70b
   - _self_
 
 data:
   max_prompt_length: 2048
-  max_response_length: 16384
+  max_response_length: 2048
   return_raw_chat: true
   train_files:
     - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd.parquet
@@ -22,9 +24,8 @@ data:
 
 actor_rollout_ref:
   model:
-    # Default is meta-llama/Llama-3.1-8B-Instruct
-    path: meta-llama/Llama-3.1-70B-Instruct
-    tokenizer_path: ./llama-3.1-70b-tokenizer
+    path: ${model.path}
+    tokenizer_path: ${oc.select:model.tokenizer_path,null}
   rollout:
     # max_num_batched_tokens: 16384
     n: 64

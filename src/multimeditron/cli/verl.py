@@ -40,6 +40,7 @@ def verl_config(output: Optional[str] = None):
 @click.option("--trust-remote-code/--no-trust-remote-code", default=False, help="Whether to trust remote code when loading models from HuggingFace.")
 @click.option("--dryrun", is_flag=True, help="Perform a dry run without executing the training.")
 @click.option("--config-out", "-o", type=click.Path(), help="Path to save the final configuration used for training (in YAML format).")
+@click.option("--only-config", is_flag=True, help="Only output the final configuration and exit.")
 @click.pass_context
 def verl(ctx,
          config: Optional[str] = None,
@@ -47,7 +48,8 @@ def verl(ctx,
          verbose: bool = False,
          debug: bool = False,
          dryrun: bool = False,
-         config_out: Optional[str] = None):
+         config_out: Optional[str] = None,
+         only_config: bool = False):
     from hydra import initialize_config_dir, compose
 
     if config is None:
@@ -76,6 +78,13 @@ def verl(ctx,
         with open(config_out, "w") as f:
             yaml.dump(OmegaConf.to_container(cfg, resolve=True), f, sort_keys=False)
         logger.info(f"Final configuration saved to {config_out}")
+    elif only_config:
+        from omegaconf import OmegaConf
+        print(yaml.dump(OmegaConf.to_container(cfg, resolve=True)))
+    
+    if only_config:
+        logger.info("Only configuration output requested. Exiting.")
+        return
     
     # If dryrun, we just print the configuration and exit
     if dryrun:

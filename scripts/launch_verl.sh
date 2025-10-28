@@ -131,9 +131,10 @@ if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
         $VENV_DIR
     source ./$VENV_DIR/bin/activate
 
-    pip install pynvml
+    pip install nvidia-ml-py
     pip install -e .
     pip install -e third-party/verl
+    pip uninstall -y pynvml
 fi
 
 # Retrieve the script directory

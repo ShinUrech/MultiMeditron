@@ -18,11 +18,10 @@ class TaskRunner:
             pprint(cfg.model_dump())
 
         # Instantiate tokenizer
-        print("Instantiating tokenizer...")
         tokenizer_path = cfg.actor_rollout_ref.model.get("tokenizer_path", None)
         if tokenizer_path is None:
             tokenizer_path = cfg.actor_rollout_ref.model.path
-
+        print(f"Loading tokenizer from {tokenizer_path}...")
         tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path,
             use_fast=True,
