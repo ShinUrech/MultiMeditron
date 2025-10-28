@@ -2,7 +2,6 @@ hydra:
   searchpath:
     - pkg://multimeditron.config
     - pkg://verl.trainer.config
-    - model
 
 defaults:
   - verl_trainer

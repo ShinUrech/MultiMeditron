@@ -17,7 +17,7 @@ Usage: $0 --config <config_name> [--num-nodes <num_nodes>]
          [--no-confirm] [--help]
 Options:
   --config <config_name>    (Required) Path to the configuration file.
-  --environment             (Optional) Path to the environment, default to `~/.edf/multimodal.toml`.
+  --environment             (Optional) Path to the environment, default to \`~/.edf/multimodal.toml\`.
   --experiment-name <name>  (Optional) Name of the experiment. Default is derived from the date and time.
   --num-nodes <num_nodes>   (Optional) Number of nodes to use. If not provided, the user will be prompted.
   --report-dir <report_dir> (Optional) Directory to save reports. Default is './reports/verl'.
@@ -125,11 +125,24 @@ fi
 # Check that the venv dir exists, if not create and install it
 if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
     echo "Generating virtual environment for running the script at $VENV_DIR"
+    YELLOW='\033[1;33m'
+    NC='\033[0m' # No Color
+    echo -e "${YELLOW}WARNING: This will (re)create the virtual environment and install dependencies, which may take some time."
+    echo -e "Make sure that you are running this script with the barebones environment, you SHOULD NOT DO ANY PIP INSTALLS PRIOR TO THIS STEP."
+    echo -e "This is because the virtual environment is created with system-site-packages, if you added system-wide packages, they will be inherited here."
+    echo -e "There once you'll reuse the venv from a fresh environment it won't be able to find the packages installed system-wide.${NC}"
+
+    read -p "I acknowledge and want to proceed. Type 'yes' to continue: " confirm_venv
+    if [[ "$confirm_venv" != "yes" ]]; then
+        echo "Aborting."
+        exit 0
+    fi
+
     python -m venv \
         --system-site-packages \
         --symlinks \
         $VENV_DIR
-    source ./$VENV_DIR/bin/activate
+    source "$VENV_DIR/bin/activate"
 
     pip install nvidia-ml-py
     pip install -e .
