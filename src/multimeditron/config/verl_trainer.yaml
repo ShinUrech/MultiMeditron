@@ -3,11 +3,11 @@ defaults:
   - _self_
 
 data:
-  max_prompt_length: 2048
-  max_response_length: 2048
+  max_prompt_length: 4096
+  max_response_length: 4096
   trust_remote_code: ${trust_remote_code}
-  train_batch_size: 8
-  val_batch_size: 8
+  train_batch_size: 4
+  val_batch_size: 4
   train_files:
     - ./mock_dataset/mock_dataset.parquet
   val_files:
@@ -51,6 +51,8 @@ actor_rollout_ref:
   model:
     path: meta-llama/Llama-3.1-8B-Instruct
     use_shm: false
+    use_remove_padding: true
+    enable_gradient_checkpointing: true
     trust_remote_code: ${trust_remote_code}
   rollout:
     prompt_length: ${data.max_prompt_length}
@@ -58,19 +60,25 @@ actor_rollout_ref:
     max_model_len: null
     max_num_batched_tokens: 8192
     max_num_seqs: 1024
-    n: 128
+    n: 64
     load_format: auto
     dtype: bfloat16
     name: sglang
-    log_prob_micro_batch_size_per_gpu: 32
+    log_prob_micro_batch_size_per_gpu: 16
+    tensor_model_parallel_size: 4
+    data_parallel_size: 1
+    gpu_memory_utilization: 0.8
+    free_cache_engine: true
   actor:
     fsdp_config:
       model_dtype: bfloat16
-    ppo_mini_batch_size: 256
+      param_offload: true
+      optimizer_offload: true
+    ppo_mini_batch_size: 64
     # ppo_micro_batch_size: 16
-    ppo_micro_batch_size_per_gpu: 16 
+    ppo_micro_batch_size_per_gpu: 4
     use_dynamic_bsz: false
-    ppo_max_token_len_per_gpu: 16384
+    ppo_max_token_len_per_gpu: 8192
   ref:
     log_prob_micro_batch_size_per_gpu: ${actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu}
     fsdp_config:

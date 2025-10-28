@@ -5,7 +5,6 @@ hydra:
 
 defaults:
   - verl_trainer
-  - nsjail-python-exec-pool
   - llama3.1_chat_template
   - _self_
 
@@ -22,13 +21,21 @@ data:
   return_multi_modal_inputs: false
 
 actor_rollout_ref:
+  model:
+    # Default is meta-llama/Llama-3.1-8B-Instruct
+    path: meta-llama/Llama-3.1-70B-Instruct
   rollout:
-    max_num_batched_tokens: 16384
-    n: 128
-    max_num_seqs: 256
+    # max_num_batched_tokens: 16384
+    n: 64
+    # max_num_seqs: 256
     multi_turn:
       enable: true
-      max_tool_response_length: 4096
-      max_assistant_turns: 5
+      max_tool_response_length: 2048
+      max_assistant_turns: 3
       tokenization_sanity_check_mode: strict
       tool_config_path: /users/gboye/MultiMeditron/config/rl/grpo/tools.yaml
+
+services:
+  - name: nsjail-python-exec-pool
+    defaults:
+      - nsjail-python-exec-pool

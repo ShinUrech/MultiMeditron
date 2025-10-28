@@ -38,10 +38,28 @@ if [[ $SLURM_NODEID -eq 0 ]]; then
         --dashboard-port=8265
 
     # Await for the head node to initialize (await for 1 whole minues)
-    sleep 20 
+    trials=12
+    for i in $(seq 1 $trials); do
+        echo "Checking if Ray HEAD node is up (trial $i/$trials)..."
+        num_nodes_up=$(ray list nodes --filter state=ALIVE --format json | python -c "import json; print(len(json.loads(input())))")
+        if [[ $num_nodes_up -ge $SLURM_NNODES ]]; then
+            echo "All $num_nodes_up nodes are up!"
+            break
+        else
+            echo "Only $num_nodes_up/$SLURM_NNODES nodes are up. Retrying in 5 seconds..."
+            sleep 5
+        fi
+    done
+
+    # If after all trials the nodes are not up, exit with error
+    if [[ $num_nodes_up -lt $SLURM_NNODES ]]; then
+        echo "Error: Only $num_nodes_up/$SLURM_NNODES nodes are up after waiting. Exiting."
+        ray stop
+        exit 1
+    fi
 else
     # Sleep to ensure the head node starts before workers try to connect
-    sleep 10
+    sleep 2
 
     # Start ray WORKER nodes
     echo "Starting Ray WORKER node on $(hostname)"

@@ -1,41 +1,33 @@
-services:
-  # Configuration for the tool instance
-  # You can modify limits, but I strongly recommend not changing anything
-  # without understanding the implications.
-  #
-  # In the future, we should probably ensure that the python/nsjail
-  # path is not hardcoded like it is here.
-  - name: nsjail-python-exec-pool
-    python:
-      # path: /opt/conda/envs/py312/bin/python3.12
-      path: /usr/local/bin/python3.13
-    nsjail:
-      path: /usr/bin/nsjail
-      merged_stderr: true # merge stderr into stdout
-      max_rlimit_as: 314572800 # 300 * 1024 * 1024 = 300MB
-      max_rlimit_cpu: 2 # 2 seconds of CPU time
-      max_time_limit: 5 # 5 seconds of wall time
-      max_open_files: 32 # max number of open files
-      allow_network: false
-      ro_mounts:
-        # some mounts are automatically added in NsJailExecutor in order
-        # to run python binaries and site-packages
-        - /lib
-        - /lib64
-        - /usr/lib
-        - /usr/lib64
-        - /bin/sh
-        - /dev/random
-        - /etc/ld.so.cache
-      envs:
-        LANG: en_US.UTF-8
-        OMP_NUM_THREADS: 1
-        OPENBLAS_NUM_THREADS: 1
-        MKL_NUM_THREADS: 1
-        VECLIB_MAXIMUM_THREADS: 1
-        NUMEXPR_NUM_THREADS: 1
-        PYTHONIOENCODING: utf-8:strict
-        # PYTHONPATH will be set automatically to include the python packages
-    pool:
-      parallelism: 16
-      cpu_per_job: 1
+python:
+  # path: /opt/conda/envs/py312/bin/python3.12
+  path: /usr/local/bin/python3.13
+nsjail:
+  path: /usr/bin/nsjail
+  merged_stderr: true # merge stderr into stdout
+  max_rlimit_as: 314572800 # 300 * 1024 * 1024 = 300MB
+  max_rlimit_cpu: 2 # 2 seconds of CPU time
+  max_time_limit: 5 # 5 seconds of wall time
+  max_open_files: 32 # max number of open files
+  allow_network: false
+  ro_mounts:
+    # some mounts are automatically added in NsJailExecutor in order
+    # to run python binaries and site-packages
+    - /lib
+    - /lib64
+    - /usr/lib
+    - /usr/lib64
+    - /bin/sh
+    - /dev/random
+    - /etc/ld.so.cache
+  envs:
+    LANG: en_US.UTF-8
+    OMP_NUM_THREADS: 1
+    OPENBLAS_NUM_THREADS: 1
+    MKL_NUM_THREADS: 1
+    VECLIB_MAXIMUM_THREADS: 1
+    NUMEXPR_NUM_THREADS: 1
+    PYTHONIOENCODING: utf-8:strict
+    # PYTHONPATH will be set automatically to include the python packages
+pool:
+  parallelism: 16
+  cpu_per_job: 1

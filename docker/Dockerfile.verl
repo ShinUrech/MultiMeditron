@@ -174,7 +174,7 @@ RUN {   echo "# =================================================="; \
         echo ""; \
     } >> /etc/zsh/zshrc
     
-# Installing required dependencies
+# # Installing required dependencies
 RUN pip3 install --upgrade pip && pip3 install -U \
     ninja accelerate datasets "transformers==4.56.2" \
     codetiming dill hydra-core pandas wandb      \

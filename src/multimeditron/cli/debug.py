@@ -1,11 +1,13 @@
+from typing import Optional
 from multimeditron.cli import EPILOG, CONFIG_PATH, main_cli
 from multimeditron.tools.python_exec import init_nsjail_python_executor, NsJailPythonExecutorPool
-from multimeditron.utils import get_torch_dtype
-from datasets import load_dataset
 from omegaconf import OmegaConf
 from ray import serve
 from fastapi import Request
+import os
+import sys
 import ray
+import click
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,46 +42,36 @@ class PyExecService:
             logger.exception("Error executing code")
             return {"error": str(e)}
 
-@main_cli.command("serve")
-def _serve():
-    cfg = OmegaConf.create({
-        "python": {
-            "path": "/opt/conda/envs/py312/bin/python3.12",  # path to python binary inside the jail
-        },
-        "nsjail": {
-            "path": "/usr/bin/nsjail",
-            "max_rlimit_as": 64 * 1024 * 1024,  # 64MB
-            "max_rlimit_cpu": 2,  # 2 seconds of CPU time
-            "max_time_limit": 5, # 5 seconds of wall time
-            "max_open_fds": 16,  # max number of open file descriptors is 16
-            "allow_network": False,
-            "ro_mounts": [
-                "/lib",
-                "/lib64",
-                "/usr/lib",
-                "/usr/lib64",
-                "/bin/sh",
-                "/dev/random",
-                "/etc/ld.so.cache",
-            ],
-            "envs": {
-                "LANG": "en_US.UTF-8",
-                "OMP_NUM_THREADS": "1",  # limit to 1 thread
-                "OPENBLAS_NUM_THREADS": "1",
-                "MKL_NUM_THREADS": "1",
-                "VECLIB_MAXIMUM_THREADS": "1",
-                "NUMEXPR_NUM_THREADS": "1",
-                "PYTHONIOENCODING": "utf-8:strict",
-            },
-        },
-        "pool": {
-            "parallelism": 4,  # number of concurrent executors in the pool
-            "cpu_per_job": 1,  # number of CPUs per executor
-        },
-    })
+@main_cli.command("serve-python", epilog=EPILOG, context_settings=dict(ignore_unknown_options=True, allow_extra_args=True))
+@click.option("--config", "-c", type=click.Path(exists=True), help="Path to the configuration file(s) in YAML format.")
+@click.pass_context
+def serve_nsjail_python(ctx, config: Optional[str] = None):
+    """
+    Create and run a Ray Serve service that executes Python code snippets in isolated nsjail environments.
+    """
 
+    from hydra import initialize_config_dir, compose
+
+    if config is None:
+        with initialize_config_dir(config_dir=CONFIG_PATH, version_base="1.2"):
+            cfg = compose(config_name="nsjail-python-exec-pool", overrides=ctx.args)
+    else:
+        config_dir = os.path.dirname(os.path.abspath(config))
+        config_name = os.path.basename(config)
+        with initialize_config_dir(config_dir=config_dir, version_base="1.2"):
+            cfg = compose(config_name=config_name, overrides=ctx.args)
+    
     # Start ray if not already running
-    ray.init(address="auto", namespace="serve")
+    if not ray.is_initialized():
+        kwargs = {
+            "runtime_env": {
+                "env_vars": {
+                    "TOKENIZERS_PARALLELISM": "true",
+                },
+                "py_executable": sys.executable, # Use the same Python executable (notably for venvs)
+            }
+        }
+        ray.init(address="auto", namespace="serve", **kwargs)
 
     # Deploy service
     executor_pool = init_nsjail_python_executor(cfg)
