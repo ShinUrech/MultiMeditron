@@ -192,7 +192,7 @@ if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
     pip uninstall -y pynvml
 
     # Use for validation against environment mismatch during job launch
-    echo "image = \"$EDF_ENVIRONMENT_IMAGE\"" > "$VENV_DIR/.edf_image"
+    echo "$ENVIRONMENT_EDF_IMAGE" > "$VENV_DIR/.edf_image"
 fi
 
 # Retrieve the script directory

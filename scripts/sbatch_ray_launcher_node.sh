@@ -10,6 +10,28 @@ unset {http,https,ftp,no}_proxy # Same here, having those variable set (even emp
 echo "Activating virtual environment at $VENV_DIR"
 source "$VENV_DIR/bin/activate"
 
+# Verify environment image used
+if [ ! -z "$SLURM_EDF_EXPANDED" ]; then
+    CURRENT_EDF_IMAGE=$(echo "$SLURM_EDF_EXPANDED" | grep -oP '\s*image\s*=\s*"\K[^"]+')
+
+    echo "Current EDF image: $CURRENT_EDF_IMAGE"
+
+    # Load the edf image stored under $VENV_DIR/.edf_image
+    if [ -f "$VENV_DIR/.edf_image" ]; then
+        EXPECTED_EDF_IMAGE=$(cat "$VENV_DIR/.edf_image")
+        echo "Expected EDF image: $EXPECTED_EDF_IMAGE"  
+        if [ "$CURRENT_EDF_IMAGE" != "$EXPECTED_EDF_IMAGE" ]; then
+            echo "Error: Current EDF image ($CURRENT_EDF_IMAGE) does not match expected EDF image ($EXPECTED_EDF_IMAGE)."
+            exit 1
+        else
+            echo "EDF image verification passed."
+        fi
+    fi
+else
+    echo "SLURM_EDF_EXPANDED is not set, cannot verify EDF image."
+    CURRENT_EDF_IMAGE=""
+fi
+
 # Traveller be aware, beneath lies the sources of all evil,
 # What maketh the mighty nsjail to falter and succomb,
 # Is a poison made of bashisms and slurmisms,
