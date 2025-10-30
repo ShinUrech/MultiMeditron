@@ -47,7 +47,7 @@ else
 
     # We expect the SLURM_EDF_EXPANDED to contains a key image = "..."
     if [ ! -z "$EDF_EXPANDED" ]; then
-        CURRENT_EDF_IMAGE=$(echo "$EDF_EXPANDED" | grep -oP '\s*image\s*=\s*"\K[^"]+')
+        CURRENT_EDF_IMAGE=$(echo "$EDF_EXPANDED" | grep -oP '^\s*image\s*=\s*"\K[^"]+')
     else
         CURRENT_EDF_IMAGE=""
     fi
@@ -130,7 +130,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # Find the image corresponding with the current environemtn file
-ENVIRONMENT_EDF_IMAGE=$(grep -oP '\s*image\s*=\s*"\K[^"]+' "$ENVIRONMENT")
+ENVIRONMENT_EDF_IMAGE=$(grep -oP '^\s*image\s*=\s*"\K[^"]+' "$ENVIRONMENT")
 echo -e "${GREEN}Using environment file: $ENVIRONMENT which specifies image: $ENVIRONMENT_EDF_IMAGE${NC}"
 
 # Check the config name is provided
