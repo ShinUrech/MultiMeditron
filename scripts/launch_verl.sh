@@ -38,7 +38,7 @@ EOF
 # Detect login node (hostname is of format `clariden-lnXXX`)
 HOSTNAME=$(hostname)
 IS_LOGIN_NODE=false
-CURRENT_ENVIRONMENT_FILE=""
+CURRENT_EDF_IMAGE=""
 if [[ "$HOSTNAME" == *-ln* ]]; then
     IS_LOGIN_NODE=true
     echo -e "${BLUE}Detected, running on login node, cannot create virtual environment here.${NC}"
@@ -47,9 +47,9 @@ else
 
     # We expect the SLURM_EDF_EXPANDED to contains a key image = "..."
     if [ ! -z "$EDF_EXPANDED" ]; then
-        CURRENT_ENVIRONMENT_FILE=$(echo "$EDF_EXPANDED" | grep -oP '\s*image\s*=\s*"\K[^"]+')
+        CURRENT_EDF_IMAGE=$(echo "$EDF_EXPANDED" | grep -oP '\s*image\s*=\s*"\K[^"]+')
     else
-        CURRENT_ENVIRONMENT_FILE=""
+        CURRENT_EDF_IMAGE=""
     fi
 fi
 
@@ -129,6 +129,10 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
+# Find the image corresponding with the current environemtn file
+ENVIRONMENT_EDF_IMAGE=$(grep -oP '\s*image\s*=\s*"\K[^"]+' "$ENVIRONMENT")
+echo -e "${GREEN}Using environment file: $ENVIRONMENT which specifies image: $ENVIRONMENT_EDF_IMAGE${NC}"
+
 # Check the config name is provided
 if [ -z "$CONFIG_NAME" ]; then
     echo "Error: --config <config_name> is required."
@@ -155,9 +159,13 @@ if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
     fi
 
     # Check current environment file matches the expected one
-    if [ ! -z "$CURRENT_ENVIRONMENT_FILE" ] && [ "$CURRENT_ENVIRONMENT_FILE" != "$ENVIRONMENT" ]; then
-        echo -e "${RED}Error: The current EDF environment file ($CURRENT_ENVIRONMENT_FILE) does not match the specified one ($ENVIRONMENT).${NC}"
-        exit 1
+    if [ -z "$CURRENT_EDF_IMAGE" ]; then
+        echo "${YELLOW}WARNING: Could not determine the current EDF environment image. Proceeding anyway.${NC}"
+    else
+        if [ "$CURRENT_EDF_IMAGE" != "$ENVIRONMENT_EDF_IMAGE" ]; then
+            echo -e "${RED}Error: The current EDF environment file ($CURRENT_EDF_IMAGE) does not match the specified one ($ENVIRONMENT).${NC}"
+            exit 1
+        fi
     fi
 
     echo "Generating virtual environment for running the script at $VENV_DIR"
@@ -182,6 +190,9 @@ if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
     pip install -e .
     pip install -e third-party/verl
     pip uninstall -y pynvml
+
+    # Use for validation against environment mismatch during job launch
+    echo "image = \"$EDF_ENVIRONMENT_IMAGE\"" > "$VENV_DIR/.edf_image"
 fi
 
 # Retrieve the script directory
