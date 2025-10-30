@@ -6,10 +6,16 @@
 # -----------------------------------
 
 # If run from an interactive shell, make sure that SLURM environment variables are not set
+EDF_EXPANDED="$SLURM_EDF_EXPANDED"
 unset ${!SLURM_*}
 set -e
 
 # Global, constants
+YELLOW='\033[1;33m'
+GREEN='\033[1;32m'
+BLUE='\033[1;34m'
+RED='\033[1;31m'
+NC='\033[0m' # No Color
 PURPOSE_STRING="Launch a SLURM job for training using Ray with VERL dependencies."
 USAGE_STRING=$(cat <<EOF
 Usage: $0 --config <config_name> [--num-nodes <num_nodes>]
@@ -28,6 +34,26 @@ Options:
   --help                    (Optional) Display this help message and exit.
 EOF
 )
+
+# Detect login node (hostname is of format `clariden-lnXXX`)
+HOSTNAME=$(hostname)
+IS_LOGIN_NODE=false
+CURRENT_ENVIRONMENT_FILE=""
+if [[ "$HOSTNAME" == *-ln* ]]; then
+    IS_LOGIN_NODE=true
+    echo -e "${BLUE}Detected, running on login node, cannot create virtual environment here.${NC}"
+else
+    echo -e "${BLUE}Running on compute node $HOSTNAME.${NC}"
+
+    # We expect the SLURM_EDF_EXPANDED to contains a key image = "..."
+    if [ ! -z "$EDF_EXPANDED" ]; then
+        CURRENT_ENVIRONMENT_FILE=$(echo "$EDF_EXPANDED" | grep -oP '\s*image\s*=\s*"\K[^"]+')
+    else
+        CURRENT_ENVIRONMENT_FILE=""
+    fi
+fi
+
+exit 0
 
 # Default values
 CONFIG_NAME=""
@@ -124,9 +150,19 @@ fi
 
 # Check that the venv dir exists, if not create and install it
 if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
+    # Ensure not on the login node
+    if [ "$IS_LOGIN_NODE" = true ]; then
+        echo -e "${RED}Error: Cannot create or recreate virtual environment on login node.${NC}"
+        exit 1
+    fi
+
+    # Check current environment file matches the expected one
+    if [ ! -z "$CURRENT_ENVIRONMENT_FILE" ] && [ "$CURRENT_ENVIRONMENT_FILE" != "$ENVIRONMENT" ]; then
+        echo -e "${RED}Error: The current EDF environment file ($CURRENT_ENVIRONMENT_FILE) does not match the specified one ($ENVIRONMENT).${NC}"
+        exit 1
+    fi
+
     echo "Generating virtual environment for running the script at $VENV_DIR"
-    YELLOW='\033[1;33m'
-    NC='\033[0m' # No Color
     echo -e "${YELLOW}WARNING: This will (re)create the virtual environment and install dependencies, which may take some time."
     echo -e "Make sure that you are running this script with the barebones environment, you SHOULD NOT DO ANY PIP INSTALLS PRIOR TO THIS STEP."
     echo -e "This is because the virtual environment is created with system-site-packages, if you added system-wide packages, they will be inherited here."
