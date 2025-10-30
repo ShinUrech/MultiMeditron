@@ -53,8 +53,6 @@ else
     fi
 fi
 
-exit 0
-
 # Default values
 CONFIG_NAME=""
 NUM_NODES=""
