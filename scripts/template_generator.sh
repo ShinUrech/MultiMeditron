@@ -69,7 +69,7 @@ Today Date: {{ date_string }}\n
       {{ message['content'] | tojson }}
     {%- else %}
       {{ message['content'] | trim }}
-    {%- endif %}<|eot_id|>
+    {%- endif %}<|eom_id|>
   {%- endif %}
 {%- endfor %}
 

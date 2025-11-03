@@ -33,21 +33,27 @@ def set_chat_template(
     Load a tokenizer from `tokenizer_path`, overwrite its chat template with the content of `chat_template`,
     and save the modified tokenizer to `output`.
     """
-    from transformers import AutoTokenizer
+    from transformers import AutoTokenizer, AutoModelForCausalLM
     import logging
+    logging.basicConfig(level=logging.INFO)
+
     logger = logging.getLogger(__name__)
 
     logger.info(f"Loading tokenizer from {tokenizer_path}...")
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(tokenizer_path, trust_remote_code=True, device_map="auto")
 
     logger.info(f"Reading chat template from {chat_template}...")
     with open(chat_template, "r") as f:
         template_content = f.read()
     tokenizer.chat_template = template_content
     if tokenizer.pad_token is None:
-        print("No pad token found, set pad token to eos token")
+        logger.warning("No pad token found, set pad token to eos token")
         tokenizer.pad_token = tokenizer.eos_token
 
+    logger.info("Saving model to output...")
+    model.save_pretrained(output)
     logger.info(f"Saving modified tokenizer to {output}...")
     tokenizer.save_pretrained(output)
     logger.info(f"Modified tokenizer saved to {output}")
+

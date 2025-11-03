@@ -1,0 +1,18 @@
+global_profiler:
+  save_path: reports/profiler
+  steps: [1, 2]
+  discrete: False
+actor_rollout_ref:
+  actor:
+    profiler:
+      enable: true
+      all_ranks: true
+  # rollout & ref follow actor settings
+  critic:
+    profiler:
+      enable: true
+      all_ranks: true
+  reward_model:
+    profiler:
+      enable: true
+      all_ranks: true

@@ -5,7 +5,6 @@ hydra:
 
 defaults:
   - verl_trainer
-  - verl_profiling
   - nsjail-python-exec-pool
   - model/llama-3.1-70b
   - _self_
@@ -13,6 +12,8 @@ defaults:
 data:
   max_prompt_length: 2048
   max_response_length: 2048
+  train_batch_size: 32
+  val_batch_size: 32
   return_raw_chat: true
   train_files:
     - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd.parquet
@@ -27,14 +28,21 @@ actor_rollout_ref:
     path: ${model.path}
     tokenizer_path: ${oc.select:model.tokenizer_path,null}
   rollout:
-    disable_log_stats: false
-
-    # max_num_batched_tokens: 16384
     n: 64
-    # max_num_seqs: 256
+    log_prob_micro_batch_size_per_gpu: 16
+    tensor_model_parallel_size: 4
+    data_parallel_size: 1
+    free_cache_engine: true
+
     multi_turn:
       enable: true
       max_tool_response_length: 2048
       max_assistant_turns: 3
       tokenization_sanity_check_mode: strict
       tool_config_path: /users/gboye/MultiMeditron/config/rl/grpo/tools.yaml
+  actor:
+    ppo_mini_batch_size: 1024
+    ppo_micro_batch_size_per_gpu: 16
+    fsdp_config:
+      param_offload: true
+      optimizer_offload: true

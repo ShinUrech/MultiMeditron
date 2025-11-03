@@ -30,6 +30,7 @@ Options:
   --venv-dir <venv_dir>     (Optional) Directory to store the virtual environment to. Default to './.venv'.
   --timeout <timeout>       (Optional) Job timeout in HH:MM:SS format. Default is '11:59:00'.
   --no-confirm              If set, skips the confirmation prompt before job submission.
+  --debug                   (Optional) Launch the job in the debug partition instead of normal.
   --recreate-venv           If set, recreate the venv and rerun the install script.
   --help                    (Optional) Display this help message and exit.
 EOF
@@ -63,6 +64,7 @@ VENV_DIR="./.venv"
 ENVIRONMENT="$HOME/.edf/multimodal.toml"
 TIMEOUT="11:59:00"
 EXPERIMENT_NAME="verl-$(date +%Y%m%d-%H%M%S)"
+PARTITION="normal"
 
 # Parse command line arguments
 while [[ "$#" -gt 0 ]]; do
@@ -108,6 +110,10 @@ while [[ "$#" -gt 0 ]]; do
             shift # past argument
             shift # past value
             ;;
+        --debug)
+            PARTITION="debug"
+            shift # past argument
+            ;;
         --no-confirm)
             NO_CONFIRM="1"
             shift # past argument
@@ -132,6 +138,12 @@ done
 # Find the image corresponding with the current environemtn file
 ENVIRONMENT_EDF_IMAGE=$(grep -oP '^\s*image\s*=\s*"\K[^"]+' "$ENVIRONMENT")
 echo -e "${GREEN}Using environment file: $ENVIRONMENT which specifies image: $ENVIRONMENT_EDF_IMAGE${NC}"
+
+# If in debug mode, set timeout to 01:30:00
+if [ "$PARTITION" = "debug" ]; then
+    TIMEOUT="01:30:00"
+    echo -e "${YELLOW}Debug mode enabled, setting timeout to $TIMEOUT and partition to debug.${NC}"
+fi
 
 # Check the config name is provided
 if [ -z "$CONFIG_NAME" ]; then
@@ -208,8 +220,10 @@ else
 fi
 mkdir -p "$REPORT_DIR"
 
-REPORT_STDOUT_FILE="$REPORT_DIR/verl-$(date +%Y%m%d-%H%M%S)-%j.out"
-REPORT_STDERR_FILE="$REPORT_DIR/verl-$(date +%Y%m%d-%H%M%S)-%j.err"
+FILE_POSTFIX="verl-$(date +%Y%m%d-%H%M%S)-%j"
+REPORT_STDOUT_FILE="$REPORT_DIR/$FILE_POSTFIX-%j.out"
+REPORT_STDERR_FILE="$REPORT_DIR/$FILE_POSTFIX-%j.err"
+REPORT_CONFIG_OUT_FILE="$REPORT_DIR/$FILE_POSTFIX-\$SLURM_JOB_ID-config.yaml"
 
 # Display summary of parameters
 echo ""
@@ -238,7 +252,7 @@ cmd="sbatch \
 --ntasks-per-node=1 \
 --cpus-per-task=280 \
 --gpus-per-node=4 \
---partition=normal \
+--partition=$PARTITION \
 --mem=380G \
 -A a127 \
 --environment=$ENVIRONMENT \
@@ -247,6 +261,7 @@ cmd="sbatch \
 ${SCRIPT_DIR}/sbatch_ray_launcher.sh \
 mm verl \
 -c $CONFIG_NAME \
+--config-out $REPORT_CONFIG_OUT_FILE \
 trainer.nnodes=$NUM_NODES \
 trainer.n_gpus_per_node=4 \
 trainer.experiment_name=$EXPERIMENT_NAME \

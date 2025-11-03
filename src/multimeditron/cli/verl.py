@@ -95,6 +95,14 @@ def verl(ctx,
     # TODO(linjunrong.ocss884): this ENV is left for resolving SGLang conflict with ray devices
     # isolation, will solve in the future
     os.environ["ENSURE_CUDA_VISIBLE_DEVICES"] = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+
+
+    # 1 - `verl` initializes a `SGLangRollout` module during rollout, which is used to evaluate/generate samples
+    # 2 - `SGLangRollout` will initialize `Engine`, and further initialize a `torch.distributed.DeviceMesh`, used to support Tensor Parallelism (TP)
+    # 3 - `DeviceMesh.init()` internally checks the free GPU memory of all participating devices. If the difference is too large (more than ~10%),
+    #      it raises an error and aborts the execution.
+    os.environ["SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK"] = "1"
+
     if not ray.is_initialized():
         kwargs = {
             "runtime_env": {
@@ -102,6 +110,7 @@ def verl(ctx,
                     "TOKENIZERS_PARALLELISM": "true",
                     "NCCL_DEBUG": "INFO" if debug else "WARN",
                     "VLLM_LOGGING_LEVEL": "INFO" if debug else "ERROR",
+                    "SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK": "1",
                 },
                 "py_executable": sys.executable, # Use the same Python executable (notably for venvs)
             },

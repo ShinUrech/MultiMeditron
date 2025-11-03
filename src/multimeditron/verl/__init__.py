@@ -2,6 +2,7 @@ import ray
 import random
 from omegaconf import OmegaConf
 from multimeditron.verl.service import initialize_services
+import logging
 
 @ray.remote(num_cpus=1)
 class TaskRunner:
@@ -11,11 +12,7 @@ class TaskRunner:
             verbose: bool = False,
             dryrun: bool = False):
         from transformers import AutoTokenizer
-
-        if verbose:
-            from pprint import pprint
-            pprint("Final Merged Configuration:")
-            pprint(cfg.model_dump())
+        logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
 
         # Instantiate tokenizer
         tokenizer_path = cfg.actor_rollout_ref.model.get("tokenizer_path", None)
