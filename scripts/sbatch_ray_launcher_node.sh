@@ -108,9 +108,11 @@ fi
 # Script only runs on the head node from here
 ray status
 
+SCRIPT_COMMAND=$(echo "$@" | sed "s|SLURM_JOB_ID|$SLURM_JOB_ID|g")
+
 echo "Running training script on $(hostname)"
-echo "Running command: $@"
-$@ # Execute the training script passed as an argument
+echo "Running command: $SCRIPT_COMMAND"
+$SCRIPT_COMMAND # Execute the training script passed as an argument
 
 # Finally stop the ray cluster (this should also stop all of the worker noeds)
 ray stop

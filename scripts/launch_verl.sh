@@ -220,10 +220,10 @@ else
 fi
 mkdir -p "$REPORT_DIR"
 
-FILE_POSTFIX="verl-$(date +%Y%m%d-%H%M%S)-%j"
+FILE_POSTFIX="verl-$(date +%Y%m%d-%H%M%S)"
 REPORT_STDOUT_FILE="$REPORT_DIR/$FILE_POSTFIX-%j.out"
 REPORT_STDERR_FILE="$REPORT_DIR/$FILE_POSTFIX-%j.err"
-REPORT_CONFIG_OUT_FILE="$REPORT_DIR/$FILE_POSTFIX-\$SLURM_JOB_ID-config.yaml"
+REPORT_CONFIG_OUT_FILE="$REPORT_DIR/$FILE_POSTFIX-SLURM_JOB_ID-config.yaml"
 
 # Display summary of parameters
 echo ""

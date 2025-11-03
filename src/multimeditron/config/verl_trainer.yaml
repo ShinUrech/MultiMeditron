@@ -76,12 +76,13 @@ actor_rollout_ref:
     top_p: 1.0
     top_k: -1
   actor:
-    strategy: fsdp2
     entropy_checkpointing: true
     fsdp_config:
       model_dtype: bfloat16
       param_offload: false
       optimizer_offload: false
+      offload_policy: false
+      strategy: fsdp2
 
     optim:
       lr: 1e-6
@@ -99,6 +100,8 @@ actor_rollout_ref:
       model_dtype: bfloat16
       param_offload: ${actor_rollout_ref.actor.fsdp_config.param_offload}
       optimizer_offload: ${actor_rollout_ref.actor.fsdp_config.optimizer_offload}
+      offload_policy: ${actor_rollout_ref.actor.fsdp_config.offload_policy}
+      strategy: ${actor_rollout_ref.actor.fsdp_config.strategy}
 
 global_profiler:
   enable: false
