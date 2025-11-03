@@ -78,10 +78,12 @@ if [[ $SLURM_NODEID -eq 0 ]]; then
             echo "All $num_nodes_up nodes are up!"
             break
         else
-            echo "Only $num_nodes_up/$SLURM_NNODES nodes are up. Retrying in 5 seconds..."
-            sleep 5
+            echo "Only $num_nodes_up/$SLURM_NNODES nodes are up. Retrying in 10 seconds..."
+            sleep 10
         fi
     done
+
+    sleep 5 # Extra sleep to ensure stability
 
     # If after all trials the nodes are not up, exit with error
     if [[ $num_nodes_up -lt $SLURM_NNODES ]]; then
