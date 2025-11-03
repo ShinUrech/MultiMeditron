@@ -32,7 +32,7 @@ actor_rollout_ref:
     log_prob_micro_batch_size_per_gpu: 4
     log_prob_max_token_len_per_gpu: 16384
     disable_log_stats: false
-    free_cache_engine: false
+    free_cache_engine: true
     gpu_memory_utilization: 0.6
     max_num_batched_tokens: 4096
     tensor_model_parallel_size: ${trainer.n_gpus_per_node}
@@ -52,5 +52,5 @@ actor_rollout_ref:
     ppo_mini_batch_size: 256
     ppo_micro_batch_size_per_gpu: 4
     fsdp_config:
-      param_offload: false
-      optimizer_offload: false
+      param_offload: true
+      optimizer_offload: true
