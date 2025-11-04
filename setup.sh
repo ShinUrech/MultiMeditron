@@ -6,7 +6,7 @@ unset {HTTP,HTTPS,FTP,NO}_PROXY
 unset {http,https,ftp,no}_proxy
 unset ROCR_VISIBLE_DEVICES
 
-if [[ $(id -u) == 30156 ]]; then
+if [[ $(id -u) == 30156 ]] || [[ $(id -u) == 66103 ]]; then
     export WANDB_MODE="offline"
     SESSION_NAME="cluster"
 
