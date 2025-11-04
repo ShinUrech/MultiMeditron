@@ -164,6 +164,11 @@ def compute_score(data_source, solution_str, ground_truth, extra_info):
     # if do_print:
     #     print(f"Response Case: {solution_str}, Question: {extra_info['question']}, GT: {ground_truth}")
 
+    print(data_source)
+    print(solution_str)
+    print(ground_truth)
+    print(extra_info)
+
     response = solution_str
     response_lower = response.lower()
     score = response_lower.count("a") / len(response_lower) if len(response_lower) > 0 else 0

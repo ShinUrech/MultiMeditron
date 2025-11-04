@@ -74,7 +74,7 @@ actor_rollout_ref:
 
     temperature: 1.5
     top_p: 1.0
-    top_k: -1
+    top_k: 50
   actor:
     entropy_checkpointing: true
     fsdp_config:
@@ -111,6 +111,8 @@ ray:
   dashboard: 0.0.0.0:8265
   # num_cpus: 16
   num_cpus: null # Do not set when running the server
+
+  timeline_json_file: null
 
 # Global setting for trusting remote code when loading models
 trust_remote_code: false

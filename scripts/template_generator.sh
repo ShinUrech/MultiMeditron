@@ -22,8 +22,8 @@ jinja2_template=$(cat << 'EOF'
 {%- endif %}
 
 ; ============= System Prompt =============
-<|start_header_id|>system<|end_header_id|>\n
-Cutting Knowledge Date: 01 Oct 2025\n
+<|start_header_id|>system<|end_header_id|>\n\n
+Cutting Knowledge Date: December 2025\n
 Today Date: {{ date_string }}\n
 {{ "\\n" + system_message | trim + "\\n\\n" }}
 {%- if tools is not none and tools|length > 0 %}
@@ -36,8 +36,8 @@ Today Date: {{ date_string }}\n
   {%- endfor %}
   {{ "]\\n```\\n\\n" }}
   For each function call, start with the <|python_tag|> tag, then provide a JSON object with the function name and arguments. Separate multiple function calls with a semicolon `;`.\n
-  <|python_tag|>{"name": <function-name>, "arguments": <args-json-object>}<|eot_id|>\n
-{%- endif %}
+  <|python_tag|>{"name": <function-name>, "arguments": <args-json-object>}\n
+{%- endif %}<|eot_id|>
 
 ; ============= Chat Messages =============
 {%- for message in messages %}
@@ -91,8 +91,11 @@ jinja2_template=$(echo "$jinja2_template" | sed 's/^[ \t]*//')
 jinja2_template=$(echo "$jinja2_template" | tr -d '\n')
 
 # Replace '\n' with actual new line characters
-jinja2_template=$(echo "$jinja2_template" | sed -E 's/([^\\])\\n/\1\n/g')
-jinja2_template=$(echo "$jinja2_template" | sed 's/\\\\n/\\n/g')
+REPLACE_UNIQUE="NZCENZFBORFVOZUXYEZFZEFEZF1566515"
+jinja2_template=$(echo "$jinja2_template" | sed 's/\\\\n/'"$REPLACE_UNIQUE"'/g')
+jinja2_template=$(echo "$jinja2_template" | sed -E 's/\\n/\n/g')
+jinja2_template=$(echo "$jinja2_template" | sed 's/'"$REPLACE_UNIQUE"'/\\n/g')
+
 echo "$jinja2_template" 
 
 # Replace '\n' with actual new line characters

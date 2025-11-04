@@ -1,0 +1,61 @@
+hydra:
+  searchpath:
+    - pkg://multimeditron.config
+    - pkg://verl.trainer.config
+
+defaults:
+  - verl_trainer
+  - verl_profiling
+  # - nsjail-python-exec-pool
+  - model/llama-3.1-8b
+  - _self_
+
+data:
+  max_prompt_length: 2048
+  max_response_length: 2048
+  tokenizer: ${oc.select:model.tokenizer_path,model.path}
+  train_batch_size: 4
+  val_batch_size: 8
+  return_raw_chat: true
+  train_files:
+    - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd.parquet
+  val_files:
+    - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd-val.parquet
+  prompt_key: prompt
+  reward_fn_key: data_source
+  return_multi_modal_inputs: false
+
+actor_rollout_ref:
+  model:
+    path: ${model.path}
+    tokenizer_path: ${oc.select:model.tokenizer_path,model.path}
+  rollout:
+    log_prob_micro_batch_size_per_gpu: 2
+    log_prob_max_token_len_per_gpu: 2048
+    disable_log_stats: false
+    free_cache_engine: true
+    gpu_memory_utilization: 0.8
+    max_num_batched_tokens: 4096
+    tensor_model_parallel_size: ${trainer.n_gpus_per_node}
+    data_parallel_size: 1 # ${trainer.nnodes}
+    max_num_seqs: 16
+
+    # max_num_batched_tokens: 16384
+    # max_num_seqs: 256
+    n: 8
+    multi_turn:
+      enable: false
+      # max_tool_response_length: 2048
+      # max_assistant_turns: 3
+      # tokenization_sanity_check_mode: strict
+      # use_inference_chat_template: true
+      # tool_config_path: /users/gboye/MultiMeditron/config/rl/grpo/tools.yaml
+  actor:
+    ppo_mini_batch_size: 16
+    # ppo_micro_batch_size: 16
+    ppo_micro_batch_size_per_gpu: 1
+    ppo_max_token_len_per_gpu: 4096
+    fsdp_config:
+      param_offload: true
+      optimizer_offload: true
+      strategy: fsdp2

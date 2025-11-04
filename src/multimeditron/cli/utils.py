@@ -24,10 +24,12 @@ def split_host_port(hostport: str, default_port: Optional[int] = None) -> Tuple[
 @click.option("--output", "-o", type=click.Path(), required=True, help="Path to save the final tokenizer with overwritten chat template.")
 @click.option("--chat-template", "-t", type=click.Path(file_okay=True, exists=True), required=True, help="Path to the chat template file.")
 @click.option("--tokenizer-path", "-p", type=str, required=True, help="Path to the tokenizer to modify.")
+@click.option("--include-model/--no-include-model", default=False, help="Whether to include the model files when saving.")
 def set_chat_template(
     output: str,
     chat_template: str,
     tokenizer_path: str,
+    include_model: bool
 ):
     """
     Load a tokenizer from `tokenizer_path`, overwrite its chat template with the content of `chat_template`,
@@ -41,7 +43,8 @@ def set_chat_template(
 
     logger.info(f"Loading tokenizer from {tokenizer_path}...")
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(tokenizer_path, trust_remote_code=True, device_map="auto")
+    if include_model:
+        model = AutoModelForCausalLM.from_pretrained(tokenizer_path, trust_remote_code=True, device_map="auto")
 
     logger.info(f"Reading chat template from {chat_template}...")
     with open(chat_template, "r") as f:
@@ -51,8 +54,9 @@ def set_chat_template(
         logger.warning("No pad token found, set pad token to eos token")
         tokenizer.pad_token = tokenizer.eos_token
 
-    logger.info("Saving model to output...")
-    model.save_pretrained(output)
+    if include_model:
+        logger.info("Saving model to output...")
+        model.save_pretrained(output)
     logger.info(f"Saving modified tokenizer to {output}...")
     tokenizer.save_pretrained(output)
     logger.info(f"Modified tokenizer saved to {output}")

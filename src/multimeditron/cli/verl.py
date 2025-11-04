@@ -51,6 +51,7 @@ def verl(ctx,
          config_out: Optional[str] = None,
          only_config: bool = False):
     from hydra import initialize_config_dir, compose
+    from torch.cuda import is_available as cuda_is_available
 
     if config is None:
         with initialize_config_dir(config_dir=CONFIG_PATH, version_base="1.2"):
@@ -115,6 +116,25 @@ def verl(ctx,
                 "py_executable": sys.executable, # Use the same Python executable (notably for venvs)
             },
         }
+
+        if (
+            cuda_is_available()
+            and cfg.global_profiler.tool == "nsys"
+            and cfg.global_profiler.get("steps", None) is not None
+            and len(cfg.global_profiler.steps.get("steps", [])) > 0
+        ):
+            from verl.utils.import_utils import is_nvtx_available
+
+            assert is_nvtx_available(), "nvtx is required for nsys profiling, please install it via `pip install nvtx`"
+            nsight_options = OmegaConf.to_container(
+                cfg.global_profiler.global_tool_config.nsys.controller_nsight_options, resolve=True
+            )
+            logger.info(f"Enabling nsight profiling with options: {nsight_options}")
+            kwargs["runtime_env"]["nsight"] = nsight_options
+        
+        if cfg.ray.get("timeline_json_file", None) is not None:
+            logger.info(f"Ray timeline will be saved to {cfg.ray.timeline_json_file}")
+            ray.timeline(filename=cfg.ray.timeline_json_file)
 
         if cfg.ray.num_cpus is not None:
             kwargs["num_cpus"] = cfg.ray.num_cpus
