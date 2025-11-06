@@ -144,6 +144,9 @@ class MultimodalConfig(PretrainedConfig):
         self.truncation = truncation
         self.max_sequence_length = max_sequence_length
 
+        config = AutoConfig.from_pretrained(llm_path)
+        self.hidden_size = config.hidden_size
+
     def to_dict(self):
         """
         Converts the MultimodalConfig object to a dictionary representation.
@@ -644,7 +647,6 @@ def bootstrap(config, tokenizer, attachment_token_idx, modalities_config):
     """
 
     multimodal_config = MultimodalConfig(
-        hidden_size=config["token_size"],
         vocab_size=len(tokenizer),
         attachment_token_idx=attachment_token_idx,
         eos_token_idx=tokenizer.convert_tokens_to_ids(tokenizer.eos_token),
