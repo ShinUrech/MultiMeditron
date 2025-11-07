@@ -83,27 +83,46 @@ def prepare_messages_from_entry(entry: dict) -> list:
     return messages
 
 
-def generate_answer(messages, model, processor):
-    inputs = processor.apply_chat_template(
-    messages,
-    tokenize=True,
-    add_generation_prompt=True,
-    return_dict=True,
-    return_tensors="pt"
+def generate_answer(messages, model, processor, max_new_tokens=1024):
+    # build the chat text with the special tokens but DO NOT tokenize yet
+    chat_text = processor.apply_chat_template(
+        messages,
+        tokenize=False,                 # <-- important
+        add_generation_prompt=True
     )
-    inputs = inputs.to(model.device)
 
-    generated_ids = model.generate(**inputs, max_new_tokens=128)
-    generated_ids_trimmed = [
-        out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-    ]
-    output_text = processor.batch_decode(
-        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+    # extract images from the message payload in the same order
+    images = []
+    for msg in messages:
+        for part in msg["content"]:
+            if part.get("type") == "image":
+                images.append(part["image"]) 
+
+    # Run the multimodal processor to create BOTH text and vision tensors
+    inputs = processor(
+        text=chat_text,
+        images=images if images else None,
+        return_tensors="pt",
+        padding=True
     )
-    print(output_text)
+
+    # Qwen3-VL doesn't use token_type_ids
+    inputs.pop("token_type_ids", None)
+
+    # move to device
+    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+    # generate
+    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+    # trim the prompt
+    trimmed = generated_ids[:, inputs["input_ids"].shape[1]:]
+    out = processor.batch_decode(trimmed, skip_special_tokens=True)
+    print(out)
+    return out
+
     
 
-def load_qwen_vlm(model_name: str = "Qwen/Qwen3-VL-235B-A22B-Instruct", dtype="bfloat16"):
+def load_qwen_vlm(model_name: str = "Qwen/Qwen3-VL-8B-Instruct", dtype="bfloat16"):
     processor = AutoProcessor.from_pretrained(model_name)
     model = Qwen3VLForConditionalGeneration.from_pretrained(model_name, dtype=dtype, use_safetensors=True)
     model.to("cuda")
