@@ -122,7 +122,7 @@ def generate_answer(messages, model, processor, max_new_tokens=1024):
 
     
 
-def load_qwen_vlm(model_name: str = "Qwen/Qwen3-VL-8B-Instruct", dtype="bfloat16"):
+def load_qwen_vlm(model_name: str = "Qwen/Qwen3-VL-235B-A22B-Instruct", dtype="bfloat16"):
     processor = AutoProcessor.from_pretrained(model_name)
     model = Qwen3VLForConditionalGeneration.from_pretrained(model_name, dtype=dtype, use_safetensors=True)
     model.to("cuda")
