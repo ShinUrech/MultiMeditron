@@ -3,7 +3,6 @@ from datasets import load_dataset, concatenate_datasets, Image
 from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
 import fsspec
 
-# 1) Load your CSVs (v1 meta files)
 data_files = {
     "train": "https://huggingface.co/datasets/RadGenome/PMC-VQA/resolve/main/train.csv",
     "test":  "https://huggingface.co/datasets/RadGenome/PMC-VQA/resolve/main/test.csv",
@@ -104,8 +103,8 @@ def generate_answer(messages, model, processor):
     print(output_text)
     
 
-def load_qwen_vlm(model_name: str = "Qwen/Qwen3-VL-8B-Instruct", dtype="bfloat16"):
-    processor = AutoProcessor.from_pretrained("Qwen/Qwen3-VL-8B-Instruct")
+def load_qwen_vlm(model_name: str = "Qwen/Qwen3-VL-235B-A22B-Instruct", dtype="bfloat16"):
+    processor = AutoProcessor.from_pretrained(model_name)
     model = Qwen3VLForConditionalGeneration.from_pretrained(model_name, dtype=dtype, use_safetensors=True)
     model.to("cuda")
     return model, processor
@@ -113,9 +112,7 @@ def load_qwen_vlm(model_name: str = "Qwen/Qwen3-VL-8B-Instruct", dtype="bfloat16
 
 if __name__ == "__main__":
     ds = load_dataset("csv", data_files=data_files)
-    concatenated = concatenate_datasets([ds["train"], ds["test"]]).shuffle(seed=42)
-    split = concatenated.train_test_split(test_size=0.10, seed=42)
-    train_dataset = split["train"]
+    train_dataset = ds["train"]
 
     print("Train dataset size:", len(train_dataset))
     print("Columns:", train_dataset.column_names)
