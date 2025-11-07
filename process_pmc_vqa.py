@@ -1,7 +1,17 @@
 # process_pmc_vqa.py
 from datasets import load_dataset, concatenate_datasets, Image
-from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
+from transformers import Qwen3VLForConditionalGeneration, Qwen3VLMoeForConditionalGeneration, AutoProcessor
 import fsspec
+import torch
+
+from transformers import BitsAndBytesConfig
+
+bnb = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_use_double_quant=True,
+)
 
 data_files = {
     "train": "https://huggingface.co/datasets/RadGenome/PMC-VQA/resolve/main/train.csv",
@@ -83,49 +93,40 @@ def prepare_messages_from_entry(entry: dict) -> list:
     return messages
 
 
-def generate_answer(messages, model, processor, max_new_tokens=1024):
-    # build the chat text with the special tokens but DO NOT tokenize yet
-    chat_text = processor.apply_chat_template(
-        messages,
-        tokenize=False,                 # <-- important
-        add_generation_prompt=True
-    )
 
-    # extract images from the message payload in the same order
+
+def generate_answer(messages, model, processor, max_new_tokens=128):
+    chat_text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
     images = []
-    for msg in messages:
-        for part in msg["content"]:
-            if part.get("type") == "image":
-                images.append(part["image"]) 
+    for m in messages:
+        for p in m["content"]:
+            if p.get("type") == "image":
+                images.append(p["image"])
 
-    # Run the multimodal processor to create BOTH text and vision tensors
-    inputs = processor(
-        text=chat_text,
-        images=images if images else None,
-        return_tensors="pt",
-        padding=True
-    )
+    inputs = processor(text=chat_text, images=images or None, return_tensors="pt", padding=True)
+    inputs.pop("token_type_ids", None)  # not used
 
-    # Qwen3-VL doesn't use token_type_ids
-    inputs.pop("token_type_ids", None)
 
-    # move to device
-    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    with torch.inference_mode():
+        out_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
 
-    # generate
-    generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
-    # trim the prompt
-    trimmed = generated_ids[:, inputs["input_ids"].shape[1]:]
-    out = processor.batch_decode(trimmed, skip_special_tokens=True)
-    print(out)
-    return out
+    trimmed = out_ids[:, inputs["input_ids"].shape[1]:]
+    return processor.batch_decode(trimmed, skip_special_tokens=True)
+
 
     
 
 def load_qwen_vlm(model_name: str = "Qwen/Qwen3-VL-235B-A22B-Instruct", dtype="bfloat16"):
     processor = AutoProcessor.from_pretrained(model_name)
-    model = Qwen3VLForConditionalGeneration.from_pretrained(model_name, dtype=dtype, use_safetensors=True)
-    model.to("cuda")
+    if model_name == "Qwen/Qwen3-VL-8B-Instruct":
+        model = Qwen3VLForConditionalGeneration.from_pretrained(model_name, dtype=dtype, use_safetensors=True)
+    elif model_name == "Qwen/Qwen3-VL-235B-A22B-Instruct":
+        model = Qwen3VLMoeForConditionalGeneration.\
+            from_pretrained(model_name, 
+                            quantization_config=bnb, 
+                            device_map='auto', dtype=dtype, use_safetensors=True)
+    # model.to("cuda")
     return model, processor
 
 
