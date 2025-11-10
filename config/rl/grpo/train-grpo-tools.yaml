@@ -8,14 +8,13 @@ defaults:
   - verl_profiling
   - nsjail-python-exec-pool
   - model/llama-3.1-8b
-  # - reward/reward_model
   - _self_
 
 data:
   max_prompt_length: 2048
   max_response_length: 2048
   tokenizer: ${oc.select:model.tokenizer_path,model.path}
-  train_batch_size: 16
+  train_batch_size: 4
   val_batch_size: 8
   return_raw_chat: true
   train_files:
@@ -35,7 +34,7 @@ actor_rollout_ref:
     log_prob_max_token_len_per_gpu: 2048
     disable_log_stats: false
     free_cache_engine: true
-    gpu_memory_utilization: 0.7
+    gpu_memory_utilization: 0.8
     max_num_batched_tokens: 4096
     tensor_model_parallel_size: ${trainer.n_gpus_per_node}
     data_parallel_size: 1 # ${trainer.nnodes}
