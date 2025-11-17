@@ -3,18 +3,10 @@ import torch
 import random
 import argparse
 from typing import List, Dict, Tuple
-from transformers import AutoProcessor, BitsAndBytesConfig
+from transformers import AutoProcessor
 import base64
 from io import BytesIO
 import os
-
-# === optional 4-bit quantization for MedGemma ===
-bnb = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.bfloat16,
-    bnb_4bit_use_double_quant=True,
-)
 
 DATA_FILES = {
     "train": "https://huggingface.co/datasets/RadGenome/PMC-VQA/resolve/main/train.csv",
@@ -24,7 +16,7 @@ DATA_FILES = {
 ARCHIVE_URI = "hf://datasets/RadGenome/PMC-VQA/images.zip"
 MEMBER_PREFIX = "images/"
 
-# =============== Utilities ===============
+# === Utilities ===
 def _normalize_choice(text: str) -> str:
     if text is None:
         return ""
@@ -75,21 +67,38 @@ def parse_model_output_for_rationale(generation: str) -> str:
         return body
     return gen
 
-def build_prompt(entry: dict) -> Tuple[str, Dict[str,str], str, str]:
+def build_prompt(entry: dict) -> Tuple[str, Dict[str, str], str, str]:
     q = str(entry.get("Question", "")).strip()
     choices = extract_choices(entry)
     label, text = correct_label_and_text(entry, choices)
+
+    opts_str = "\n".join([f"{k}. {v}" for k, v in choices.items() if v])
+
     prompt = (
-        "You are a Medical Expert.\n"
-        "Carefully inspect the figure and answer the multiple-choice question.\n\n"
+        "Carefully inspect the provided figure and consider the multiple-choice question.\n\n"
         f"Question: {q}\n"
-        "Options:\n" + "\n".join([f"{k}. {v}" for k, v in choices.items() if v]) + "\n\n"
-        f"Task: Explain succinctly (3–5 sentences) why the correct answer is {label} ({text}), "
-        "citing visible image evidence and clinically relevant reasoning. "
-        "Avoid chain-of-thought or step-by-step scratchpads; give a clear, self-contained rationale.\n"
-        "Format:\nRationale: ...\nFinal Answer: <letter>"
+        f"Options:\n{opts_str}\n\n"
+        f"The correct answer has already been determined to be option {label} ({text}). "
+        "Do NOT change this answer and do NOT suggest a different option.\n\n"
+        "Your task is to generate a rationale that explains why this answer is correct:\n"
+        f"- Explicitly state in your explanation that the correct response is option {label} ({text}).\n"
+        "- Infer the most plausible figure type and imaging modality when possible (e.g., X-ray, CT, MRI, FLAIR MRI, PET/CT, ultrasound, "
+        "angiography, histology slide, fundus photograph, microscopy, or a biomedical chart/graph). "
+        "Only specify a detailed MRI sequence such as FLAIR when this is clearly supported by the image appearance, labels, or the question/options.\n"
+        "- Describe the key visual findings (location, shape, size, intensity/signal, density, color, patterns, annotations, or text labels) that support this option.\n"
+        f"- Explain clearly why these findings make option {label} ({text}) the best choice.\n"
+        "- Briefly explain why each of the other options is not correct or is less consistent with the visible findings or clinical context.\n"
+        "- Use cautious medical language: when you mention a specific disease entity or histopathologic diagnosis, present it as likely/most consistent or suggestive, "
+        "and note that definitive confirmation would require appropriate clinical correlation and, when relevant, biopsy or additional testing.\n"
+        "- Keep the explanation self-contained, clinically focused, and free of meta-comments about prompts, datasets, or your own reasoning process.\n\n"
+        "Write 4–7 sentences in a single coherent paragraph (no bullet points or numbered lists).\n\n"
+        "Format:\n"
+        "Rationale: <your paragraph explicitly stating and justifying the correct option>\n"
+        f"Final Answer: {label}\n"
     )
     return prompt, choices, label, text
+
+
 
 def pil_to_data_url(pil_img, fmt="JPEG", quality=90) -> str:
     buf = BytesIO()
@@ -97,32 +106,7 @@ def pil_to_data_url(pil_img, fmt="JPEG", quality=90) -> str:
     b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     return f"data:image/{fmt.lower()};base64,{b64}"
 
-# =============== Model 2: MedGemma (transformers) ===============
-def load_medgemma(model_name: str, use_4bit: bool):
-    from transformers import AutoModelForImageTextToText
-    kwargs = {"device_map": "auto", "torch_dtype": torch.bfloat16}
-    if use_4bit:
-        kwargs["quantization_config"] = bnb
-    model = AutoModelForImageTextToText.from_pretrained(model_name, **kwargs)
-    processor = AutoProcessor.from_pretrained(model_name)
-    return model, processor
-
-def medgemma_generate(messages, model, processor, max_new_tokens=512, do_sample=False) -> str:
-    inputs = processor.apply_chat_template(
-        messages,
-        add_generation_prompt=True,
-        tokenize=True,
-        return_dict=True,
-        return_tensors="pt",
-    ).to(model.device, dtype=torch.bfloat16)
-    input_len = inputs["input_ids"].shape[-1]
-    with torch.inference_mode():
-        out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=do_sample)
-        gen_ids = out[0][input_len:]
-    return processor.decode(gen_ids, skip_special_tokens=True)
-
 def maybe_downscale(pil_img, max_side: int = 1280):
-    """Downscale very large images to keep the data URL size reasonable."""
     w, h = pil_img.size
     if max(w, h) <= max_side:
         return pil_img
@@ -130,8 +114,7 @@ def maybe_downscale(pil_img, max_side: int = 1280):
     new_size = (int(w * scale), int(h * scale))
     return pil_img.resize(new_size, Image.LANCZOS)
 
-# =============== Model 1: GPT-5 ===============
-def gpt5_generate(pil_image, prompt_text: str, gpt5_model: str = "gpt-5", max_output_tokens: int = 512) -> str:
+def gpt5_generate(pil_image, prompt_text: str, gpt5_model: str = "gpt-5.1", max_output_tokens: int = 512) -> str:
     """
     Uses OpenAI Responses API with vision input. Requires OPENAI_API_KEY and openai>=1.x.
     """
@@ -151,7 +134,7 @@ def gpt5_generate(pil_image, prompt_text: str, gpt5_model: str = "gpt-5", max_ou
 
     client = OpenAI(api_key=api_key)
 
-    def maybe_downscale(img, max_side: int = 1280):
+    def _maybe_downscale(img, max_side: int = 1280):
         w, h = img.size
         if max(w, h) <= max_side:
             return img
@@ -159,7 +142,7 @@ def gpt5_generate(pil_image, prompt_text: str, gpt5_model: str = "gpt-5", max_ou
         new_size = (int(w * scale), int(h * scale))
         return img.resize(new_size, Image.LANCZOS)
 
-    pil_image = maybe_downscale(pil_image)
+    pil_image = _maybe_downscale(pil_image)
 
     buf = BytesIO()
     pil_image.convert("RGB").save(buf, format="JPEG", quality=90)
@@ -190,29 +173,43 @@ def gpt5_generate(pil_image, prompt_text: str, gpt5_model: str = "gpt-5", max_ou
         return txt.strip()
 
 
-
-# =============== Messaging builder (shared) ===============
+# ==== Messaging builder (shared) ===
 def prepare_messages_for_entry(entry: dict) -> List[dict]:
     prompt, _, _, _ = build_prompt(entry)
     image_obj_or_url = entry.get("image_url")
     messages = [
-        {"role": "system", "content": [{"type": "text", "text": "You are an expert radiologist."}]},
-        {"role": "user", "content": [
-            {"type": "image", "image": image_obj_or_url},
-            {"type": "text", "text": prompt},
-        ]},
+        {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                            "You are a board-certified clinician and medical imaging expert. "
+                            "You interpret a wide range of medical figures, including radiology (X-ray, CT, MRI, PET/CT, ultrasound, angiography), "
+                            "nuclear medicine, endoscopy, histopathology, microscopy, ophthalmology (fundus and OCT), cardiology imaging, "
+                            "and other biomedical figures or charts."
+                    ),
+                }
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": image_obj_or_url},
+                {"type": "text", "text": prompt},
+            ],
+        },
     ]
     return messages, prompt
 
-# =============== Main ===============
+
+# === Main ===
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--split", type=str, default="train", choices=["train", "test"])
-    parser.add_argument("--k", type=int, default=5)
+    parser.add_argument("--k", type=int, default=1)  # default: one random question
     parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--no_4bit", action="store_true", default=True, help="Disable 4-bit quantization for MedGemma")
-    parser.add_argument("--medgemma_name", type=str, default="google/medgemma-4b-it")
-    parser.add_argument("--gpt5_model", type=str, default="gpt-5", help="OpenAI model name for Model1")
+    parser.add_argument("--gpt5_model", type=str, default="gpt-5.1", help="OpenAI model name")
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -235,11 +232,7 @@ def main():
         cols.remove("image_url")
         dset = dset.select_columns(["image_url"] + cols)
 
-    # === Load Model 2 (MedGemma) ===
-    use_4bit = not args.no_4bit
-    medgemma_model, medgemma_proc = load_medgemma(args.medgemma_name, use_4bit)
-
-    # === Sample k random entries ===
+    # === Sample k random entries (k defaults to 1 for this task) ===
     idxs = list(range(len(dset)))
     random.shuffle(idxs)
     idxs = idxs[: args.k]
@@ -248,34 +241,28 @@ def main():
     for i, idx in enumerate(idxs):
         entry = dset[int(idx)]
         q = str(entry.get("Question", "")).strip()
-        print(f"Figure path: {entry['Figure_path']}")  # for debugging
+        print(f"Figure path: {entry['Figure_path']}")  # for debugging / traceability
         choices = extract_choices(entry)
         label, text = correct_label_and_text(entry, choices)
 
-        # Build messages & prompt (shared text prompt used for GPT-5)
+        # Build prompt text used for GPT-5
+        _, _, _, _ = build_prompt(entry)
         messages, prompt_text = prepare_messages_for_entry(entry)
 
         # Get PIL image for GPT-5 (Vision requires actual pixels or http URL; zip:// won't work)
         pil_img = entry["image_url"]  # datasets.Image returns a PIL.Image here
 
-        # === Model 1: GPT-5 ===
         try:
             gpt5_raw = gpt5_generate(pil_img, prompt_text, gpt5_model=args.gpt5_model, max_output_tokens=600)
             gpt5_rationale = parse_model_output_for_rationale(gpt5_raw)
         except Exception as e:
             gpt5_rationale = f"[GPT-5 error: {e}]"
 
-        # === Model 2: MedGemma-4B-IT ===
-        med_raw = medgemma_generate(messages, medgemma_model, medgemma_proc, max_new_tokens=512)
-        med_rationale = parse_model_output_for_rationale(med_raw)
-
-        # === Slack-friendly block ===
         out_lines.append(block_header(i))
         out_lines.append(format_question(q, choices))
-        out_lines.append(format_rationale("Model1:", gpt5_rationale)) # GPT-5
-        out_lines.append(format_rationale("Model2:", med_rationale)) # MedGemma-4B-IT
+        out_lines.append(format_rationale("GPT-5.1:", gpt5_rationale))  # GPT-5 rationale
         out_lines.append(format_correct(label, text))
-        out_lines.append("---")  # divider
+        out_lines.append("---")
 
     final_text = "\n".join(out_lines).strip()
     print(final_text)
