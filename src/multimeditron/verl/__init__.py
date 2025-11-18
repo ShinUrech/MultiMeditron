@@ -2,14 +2,15 @@ from functools import partial
 import ray
 import random
 from omegaconf import OmegaConf
-from recipe.spin.fsdp_workers import SPINRolloutRefWorker
-from transformers import PreTrainedTokenizer
 from verl.experimental.dataset.sampler import AbstractSampler
 from verl.utils.config import validate_config
 from verl.utils.import_utils import load_extern_type
-from verl.workers.reward_manager.registry import get_reward_manager_cls
 from multimeditron.verl.service import initialize_services
+from multimeditron.verl.score import compute_score
 import logging
+
+GLOBAL_POOL_ID = "global_pool"
+
 
 @ray.remote(num_cpus=1)
 class TaskRunner:
@@ -35,37 +36,20 @@ class TaskRunner:
             use_fast=True,
             trust_remote_code=trust_remote_code
         )
-        
-        # Initialize services from the configuration
-        if cfg.get("services", None) is not None:
-            print("Initializing services...")
-            self.services = initialize_services(cfg.services)
-        
-        # For each strategy, we would have different training loops
-        # assert cfg.actor_rollout_ref.model.strategy == cfg.critic.model.strategy, "Currently only support same strategy for actor and critic"
+
+        # Setup worker mapping and resource pool
+        from verl.trainer.ppo.ray_trainer import ResourcePoolManager, Role
         from verl.single_controller.ray import RayWorkerGroup
         from verl.workers.fsdp_workers import ActorRolloutRefWorker, CriticWorker
-
-        ray_worker_group_cls = RayWorkerGroup
-
-        # Setup Ray
-        from verl.trainer.ppo.ray_trainer import ResourcePoolManager, Role
-
         role_worker_mapping = {
             Role.ActorRollout: ray.remote(ActorRolloutRefWorker),
             Role.Critic: ray.remote(CriticWorker),
             # Role.RefPolicy: ray.remote(ActorRolloutRefWorker),
             Role.RefPolicy: ray.remote(ActorRolloutRefWorker),
         }
-        global_pool_id = "global_pool"
-        reward_pool_id = "reward_pool"
+
         resource_pool_spec = {
-            global_pool_id: [cfg.trainer.n_gpus_per_node] * cfg.trainer.nnodes,
-        }
-        mapping = {
-            Role.ActorRollout: global_pool_id,
-            Role.Critic: global_pool_id,
-            Role.RefPolicy: global_pool_id,
+            GLOBAL_POOL_ID: [cfg.trainer.n_gpus_per_node] * cfg.trainer.nnodes
         }
 
         # Validate the config
@@ -75,46 +59,25 @@ class TaskRunner:
             use_critic=False,
         )
 
-        # We should adopt a multi-source reward function here
-        # - for rule-based rm, we directly call a reward score
-        # - for model-based rm, we call a model
-        # - for code related prompt, we send to a sandbox if there are test cases
-        # - finally, we combine all the rewards together
-        # - The reward type depends on the tag of the data
-
-        # If we want reward model
-        # if config.reward_model.enable:
-        #     if config.reward_model.strategy == "fsdp":
-        #         from verl.workers.fsdp_workers import RewardModelWorker
-        #     elif config.reward_model.strategy == "megatron":
-        #         from verl.workers.megatron_workers import RewardModelWorker
-        #     else:
-        #         raise NotImplementedError
-        #     role_worker_mapping[Role.RewardModel] = ray.remote(RewardModelWorker)
-        #     mapping[Role.RewardModel] = global_pool_id
+        mapping = {
+            Role.ActorRollout: GLOBAL_POOL_ID,
+            Role.Critic: GLOBAL_POOL_ID,
+            Role.RefPolicy: GLOBAL_POOL_ID,
+        }
         
         # Reference model
         # if config.algorithm.use_kl_in_reward or config.actor_rollout_ref.actor.use_kl_loss:
         if cfg.algorithm.use_kl_in_reward:
             role_worker_mapping[Role.RefPolicy] = ray.remote(ActorRolloutRefWorker)
-            mapping[Role.RefPolicy] = global_pool_id
-        
-        if cfg.reward_model.enable:
-            from verl.workers.roles import RewardModelWorker
-            role_worker_mapping[Role.RewardModel] = ray.remote(RewardModelWorker)
-
-            if cfg.reward_model.enable_resource_pool:
-                resource_pool_spec[reward_pool_id] = [cfg.reward_model.n_gpus_per_node] * cfg.reward_model.nnodes
-                resource_pool_spec[global_pool_id] = [cfg.trainer.n_gpus_per_node] * (cfg.trainer.nnodes - cfg.reward_model.nnodes)
-
-            mapping[Role.RewardModel] = reward_pool_id if cfg.reward_model.enable_resource_pool else global_pool_id
+            mapping[Role.RefPolicy] = GLOBAL_POOL_ID
 
         # Create reward function
+        from verl.workers.reward_manager.registry import get_reward_manager_cls
         reward_manager_name = cfg.reward_model.get("reward_manager", "naive")
         reward_manager_cls = get_reward_manager_cls(reward_manager_name)
 
         reward_kwargs = cfg.reward_model.get("reward_kwargs", {})
-        # compute_score_fn = partial(compute_score, **reward_kwargs)
+        from multimeditron.verl.score import compute_score
 
         # compute_score = get_custom_reward_fn(config)
         reward_fn = reward_manager_cls(
@@ -133,7 +96,13 @@ class TaskRunner:
             reward_fn_key=cfg.data.reward_fn_key,
             **reward_kwargs,
         )
+
+        # Create resource pool manager
         resource_pool_manager = ResourcePoolManager(resource_pool_spec=resource_pool_spec, mapping=mapping)
+        
+        # Initialize services from the configuration
+        if cfg.get("services", None) is not None:
+            self.services = initialize_services(cfg.services)
 
         # Create train rl smapler
         train_dataset = create_rl_dataset(
@@ -162,7 +131,7 @@ class TaskRunner:
             tokenizer=tokenizer,
             role_worker_mapping=role_worker_mapping,
             resource_pool_manager=resource_pool_manager,
-            ray_worker_group_cls=ray_worker_group_cls,
+            ray_worker_group_cls=RayWorkerGroup,
             reward_fn=reward_fn,
             val_reward_fn=val_reward_fn,
             collate_fn=collate_fn,
@@ -269,37 +238,3 @@ def create_rl_sampler(data_config, dataset):
         sampler = SequentialSampler(data_source=dataset)
 
     return sampler
-
-def compute_score(
-    data_source: str,
-    solution_str: str,
-    ground_truth: str,
-    extra_info: dict,
-    # reward_router_address: str,
-    # reward_model_tokenizer: PreTrainedTokenizer,
-):
-    # print(extra_info)
-    # if extra_info is None or "question" not in extra_info or "url" not in extra_info:
-    #     raise ValueError("Extra info is required and must contain 'question' and 'url'")
-    
-    # do_print = False
-    # if random.randint(0, 512) == 1:  
-    #     do_print = True
-    # if do_print:
-    #     print(f"Response Case: {solution_str}, Question: {extra_info['question']}, GT: {ground_truth}")
-
-    print(data_source)
-    print(solution_str)
-    print(ground_truth)
-    print(extra_info)
-
-    response = solution_str
-    response_lower = response.lower()
-    score = response_lower.count("a") / len(response_lower) if len(response_lower) > 0 else 0
-    print(f"Score: {score}")
-
-    return {
-        "score": score,
-        "acc": 0.0,
-        "pred": "Maybe",
-    }

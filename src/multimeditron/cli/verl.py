@@ -112,6 +112,7 @@ def verl(ctx,
                     "NCCL_DEBUG": "INFO" if debug else "WARN",
                     "VLLM_LOGGING_LEVEL": "INFO" if debug else "ERROR",
                     "SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK": "1",
+                    "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO": "0",
                 },
                 "py_executable": sys.executable, # Use the same Python executable (notably for venvs)
             },

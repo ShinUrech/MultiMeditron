@@ -8,7 +8,6 @@ defaults:
   - verl_profiling
   - nsjail-python-exec-pool
   - model/llama-3.1-8b
-  # - reward/reward_model
   - _self_
 
 data:

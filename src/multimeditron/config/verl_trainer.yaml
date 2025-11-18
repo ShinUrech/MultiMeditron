@@ -41,7 +41,7 @@ reward_model:
   model:
     trust_remote_code: ${trust_remote_code}
   # Which reward manager to use. Currently supported values: 'batch', 'naive', 'prime', 'dapo', 'async_dapo'
-  reward_manager: dapo
+  reward_manager: naive
   overlong_buffer: 
     enable: False # We try to avoid forgetting to set enable
     len: 0
@@ -116,3 +116,6 @@ ray:
 
 # Global setting for trusting remote code when loading models
 trust_remote_code: false
+
+# Turn on experimental verl features
+verl_experimental: false

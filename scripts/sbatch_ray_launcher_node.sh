@@ -6,6 +6,7 @@ set -e
 unset ROCR_VISIBLE_DEVICES # For some obscure reason this is set by CSCS environemtn
 unset {HTTP,HTTPS,FTP,NO}_PROXY # Same here, having those variable set (even empty) can mess up with some tools (looking at you curl)
 unset {http,https,ftp,no}_proxy # Same here, having those variable set (even empty) can mess up with some tools (looking at you curl)
+export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0 # Prevent ray from overriding env vars set to 0
 
 echo "Activating virtual environment at $VENV_DIR"
 source "$VENV_DIR/bin/activate"
@@ -43,7 +44,10 @@ ln -s /usr/lib64/libnl-3.so.200.26.0 /usr/lib64/libnl-3.so.200 # Recreate symlin
 echo "Libnl-3 sha afer fix: $(sha256sum /usr/lib64/libnl-3.so.200  | awk '{print substr($1,1,16)}'), should be '2f233046cabcd5e7'"
 
 # Summary
+export RAY_NNODE=$((SLURM_NNODES-LAUNCH_INFER))
+
 echo "Number of nodes: $SLURM_NNODES"
+echo "Number of nodes in ray cluster: $RAY_NNODE"
 echo "Node list: $SLURM_NODELIST"
 echo "Number of tasks: $SLURM_NTASKS"
 echo "CPUs per task: $SLURM_CPUS_PER_TASK"
@@ -54,6 +58,18 @@ echo "Python path: $(python -c 'import sys; print(sys.executable)')"
 echo "Ray path: $(which ray)"
 echo "Working directory: $(pwd)"
 echo "Environment variables: "
+
+# Export the environment variable for the INFER_ADDRESS if needed
+if [[ ! -z "$INFER_CONFIG_PATH" ]]; then
+    echo "INFER_HOST: $INFER_HOST"
+    echo "INFER_PORT: $INFER_PORT"
+
+    export SG_INFER_ADDRESS=$(scontrol show hostnames $SLURM_NODELIST | head -n 2 | tail -n 1)
+    export SG_INFER_ADDRESS="${SG_INFER_ADDRESS}:${INFER_PORT}"
+    export SG_INFER_API_KEY="$INFER_API_KEY"
+    echo "SG_INFER_ADDRESS: $SG_INFER_ADDRESS"
+    echo "SG_INFER_API_KEY: $INFER_API_KEY"
+fi
 
 # Start ray HEAD node
 if [[ $SLURM_NODEID -eq 0 ]]; then
@@ -74,11 +90,11 @@ if [[ $SLURM_NODEID -eq 0 ]]; then
     for i in $(seq 1 $trials); do
         echo "Checking if Ray HEAD node is up (trial $i/$trials)..."
         num_nodes_up=$(ray list nodes --filter state=ALIVE --format json | python -c "import json; print(len(json.loads(input())))")
-        if [[ $num_nodes_up -ge $SLURM_NNODES ]]; then
+        if [[ $num_nodes_up -ge $RAY_NNODE ]]; then
             echo "All $num_nodes_up nodes are up!"
             break
         else
-            echo "Only $num_nodes_up/$SLURM_NNODES nodes are up. Retrying in 10 seconds..."
+            echo "Only $num_nodes_up/$RAY_NNODE nodes are up. Retrying in 10 seconds..."
             sleep 10
         fi
     done
@@ -86,11 +102,18 @@ if [[ $SLURM_NODEID -eq 0 ]]; then
     sleep 5 # Extra sleep to ensure stability
 
     # If after all trials the nodes are not up, exit with error
-    if [[ $num_nodes_up -lt $SLURM_NNODES ]]; then
-        echo "Error: Only $num_nodes_up/$SLURM_NNODES nodes are up after waiting. Exiting."
+    if [[ $num_nodes_up -lt $RAY_NNODE ]]; then
+        echo "Error: Only $num_nodes_up/$RAY_NNODE nodes are up after waiting. Exiting."
         ray stop
         exit 1
     fi
+elif [[ $SLURM_NODEID -eq 1 && ! -z "$INFER_CONFIG_PATH" ]]; then
+    # Sleep infinity and do something else
+    echo "Starting INFERENCE node on http://$(hostname):$(INFER_PORT)"
+
+    python3 -m sglang.launch_server \
+        --config $INFER_CONFIG_PATH \
+        --host "$INFER_HOST" --port "$INFER_PORT"
 else
     # Sleep to ensure the head node starts before workers try to connect
     sleep 2

@@ -31,6 +31,7 @@ Options:
   --timeout <timeout>       (Optional) Job timeout in HH:MM:SS format. Default is '11:59:00'.
   --no-confirm              If set, skips the confirmation prompt before job submission.
   --debug                   (Optional) Launch the job in the debug partition instead of normal.
+  --launch-infer            (Optional) Launch a single node of inference in parallel to training.
   --recreate-venv           If set, recreate the venv and rerun the install script.
   --help                    (Optional) Display this help message and exit.
 EOF
@@ -40,6 +41,9 @@ EOF
 HOSTNAME=$(hostname)
 IS_LOGIN_NODE=false
 CURRENT_EDF_IMAGE=""
+INFER_PORT=63790
+INFER_HOST="0.0.0.0"
+INFER_CONFIG_PATH=""
 if [[ "$HOSTNAME" == *-ln* ]]; then
     IS_LOGIN_NODE=true
     echo -e "${BLUE}Detected, running on login node, cannot create virtual environment here.${NC}"
@@ -100,6 +104,11 @@ while [[ "$#" -gt 0 ]]; do
             shift # past argument
             shift # past value
             ;;
+        --launch-infer)
+            INFER_CONFIG_PATH="$2"
+            shift # past argument
+            shift # past value
+            ;;
         --venv-dir)
             VENV_DIR="$2"
             shift # past argument
@@ -153,6 +162,17 @@ if [ -z "$CONFIG_NAME" ]; then
 fi
 CONFIG_NAME="$(realpath "$CONFIG_NAME")"
 
+# Check that either the INFER_CONFIG_PATH is set or LAUNCH_INFER is 0
+LAUNCH_INFER=0
+if [ ! -z "$INFER_CONFIG_PATH" ]; then
+    LAUNCH_INFER=1
+    INFER_CONFIG_PATH="$(realpath "$INFER_CONFIG_PATH")"
+    INFER_API_KEY=$(openssl rand -hex 32)
+    echo -e "${GREEN}Inference config path set to: $INFER_CONFIG_PATH, will launch inference node alongside training.${NC}"
+else
+    echo -e "${GREEN}No inference config path provided, will not launch inference node alongside training.${NC}"
+fi
+
 # If the num-nodes is not provided, ask the user
 if [ -z "$NUM_NODES" ]; then
     read -p "Enter the number of nodes to use: " NUM_NODES
@@ -198,9 +218,10 @@ if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
         $VENV_DIR
     source "$VENV_DIR/bin/activate"
 
-    pip install nvidia-ml-py
+    pip install nvidia-ml-py sglang_router
     pip install -e .
     pip install -e third-party/verl
+    pip install hf_transfer orjson openai_harmony
     pip uninstall -y pynvml
 
     # Use for validation against environment mismatch during job launch
@@ -237,6 +258,7 @@ echo "  Report directory:   $REPORT_DIR"
 echo "  Stdout file:        $REPORT_STDOUT_FILE"
 echo "  Stderr file:        $REPORT_STDERR_FILE"
 echo "  Timeout:            $TIMEOUT"
+echo "  Inference config:   $INFER_CONFIG_PATH"
 echo "==================================="
 echo ""
 
@@ -256,13 +278,20 @@ cmd="sbatch \
 --mem=380G \
 -A a127 \
 --environment=$ENVIRONMENT \
---export=SCRIPT_DIR=$SCRIPT_DIR,REPORT_STDOUT_FILE=$REPORT_STDOUT_FILE,REPORT_STDERR_FILE=$REPORT_STDERR_FILE,VENV_DIR=$VENV_DIR \
-\
+--export=SCRIPT_DIR=$SCRIPT_DIR,\
+REPORT_STDOUT_FILE=$REPORT_STDOUT_FILE,\
+REPORT_STDERR_FILE=$REPORT_STDERR_FILE,\
+VENV_DIR=$VENV_DIR,\
+INFER_CONFIG_PATH=$INFER_CONFIG_PATH,\
+INFER_PORT=$INFER_PORT,\
+INFER_HOST=$INFER_HOST,\
+INFER_API_KEY=$INFER_API_KEY\
+ \
 ${SCRIPT_DIR}/sbatch_ray_launcher.sh \
 mm verl \
 -c $CONFIG_NAME \
 --config-out $REPORT_CONFIG_OUT_FILE \
-trainer.nnodes=$NUM_NODES \
+trainer.nnodes=$((NUM_NODES-LAUNCH_INFER)) \
 trainer.n_gpus_per_node=4 \
 trainer.experiment_name=$EXPERIMENT_NAME \
 "
