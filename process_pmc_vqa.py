@@ -71,7 +71,7 @@ def parse_model_output_for_rationale(generation: str) -> str:
     if "rationale:" in low:
         start_idx = low.find("rationale:")
         body = gen[start_idx + len("rationale:"):].strip()
-        fa_idx = body.lower().find("final answer:")
+        fa_idx = body.lower().find("answer:")
         if fa_idx >= 0:
             return body[:fa_idx].strip()
         return body
@@ -82,11 +82,7 @@ def build_user_message_content(question: str, choices: Dict[str, str]) -> str:
     """
     Build the user message with the reserved special token.
     """
-    lines = ["<|reserved_special_token_0|>", "\n"
-        "Based on the image, answer the question:",
-        "",
-        question.strip(),
-    ]
+    lines = ["Based on the image, answer the question:", question.strip()]
     for k in ["A", "B", "C", "D"]:
         v = choices.get(k)
         if v:
@@ -124,7 +120,7 @@ def build_prompt(entry: dict) -> Tuple[str, Dict[str, str], str, str]:
         "Write 4–7 sentences in a single coherent paragraph (no bullet points or numbered lists).\n\n"
         "Format:\n"
         "Rationale: <a paragraph explicitly stating and justifying the correct option>\n"
-        f"Final Answer: {label}\n"
+        f"Answer: {label}\n"
     )
     return prompt, choices, label, text
 
