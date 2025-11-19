@@ -9,6 +9,7 @@ import json
 import time
 from typing import List, Dict, Tuple
 from PIL import Image as PILImage
+from tqdm import tqdm
 
 
 DATA_FILES = {
@@ -155,36 +156,6 @@ def build_assistant_message_content(label: str, answer_text: str, rationale_only
     return "\n".join(parts)
 
 
-# ---- Optional: message builder for direct Responses API (not used in batch) ----
-def prepare_messages_for_entry(entry: dict) -> List[dict]:
-    prompt, _, _, _ = build_prompt(entry)
-    image_obj_or_url = entry.get("image")
-    messages = [
-        {
-            "role": "system",
-            "content": [
-                {
-                    "type": "text",
-                    "text": (
-                        "You are a board-certified clinician and medical imaging expert. "
-                        "You interpret a wide range of medical figures, including radiology (X-ray, CT, MRI, PET/CT, ultrasound, angiography), "
-                        "nuclear medicine, endoscopy, histopathology, microscopy, ophthalmology (fundus and OCT), cardiology imaging, "
-                        "and other biomedical figures or charts."
-                    ),
-                }
-            ],
-        },
-        {
-            "role": "user",
-            "content": [
-                {"type": "image", "image": image_obj_or_url},
-                {"type": "text", "text": prompt},
-            ],
-        },
-    ]
-    return messages, prompt
-
-
 # === Batch helpers ===
 def extract_output_text_from_response_obj(resp_obj: dict) -> str:
     """
@@ -214,14 +185,14 @@ def create_batch_requests_file(
     split: str,
     jsonl_path: str,
     gpt5_model: str,
-    max_output_tokens: int = 2048,
+    max_output_tokens: int = 1024,
 ):
     """
     Write one JSONL batch request file for the train split.
     """
     os.makedirs(os.path.dirname(jsonl_path), exist_ok=True)
     with open(jsonl_path, "w", encoding="utf-8") as f:
-        for idx, entry in enumerate(dataset):
+        for idx, entry in tqdm(enumerate(dataset), total=len(dataset), desc="Building batch requests"):
             prompt, _, _, _ = build_prompt(entry)
             pil_img = entry["image"]
             _, data_url = image_to_bytes_and_data_url(pil_img)
@@ -229,6 +200,19 @@ def create_batch_requests_file(
             body = {
                 "model": gpt5_model,
                 "input": [
+                    {
+                        "role": "system",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": ("You are a board-certified clinician and medical imaging expert. "
+                                          "You interpret a wide range of medical figures, including radiology (X-ray, CT, MRI, PET/CT, ultrasound, angiography), "
+                                          "nuclear medicine, endoscopy, histopathology, microscopy, ophthalmology (fundus and OCT), cardiology imaging, "
+                                          "and other biomedical figures or charts."
+                                ),
+                            },
+                        ],
+                    },
                     {
                         "role": "user",
                         "content": [
@@ -478,27 +462,29 @@ def main():
         create_batch_requests_file(
             dataset, split, requests_jsonl, args.gpt5_model, args.max_output_tokens
         )
+        print("Done building batch requests")
 
-        print("Submitting batch...")
-        batch = submit_and_wait_for_batch(
-            requests_jsonl,
-            endpoint="/v1/responses",
-            poll_interval=args.poll_interval,
-        )
-        print("Batch completed. Downloading outputs...")
-        download_batch_output(batch, results_jsonl)
 
-    print("Parsing batch outputs for train...")
-    rats = load_rationales_from_batch_output(results_jsonl)
-    print(f"Collected rationales for train: {len(rats)} examples")
+    #     print("Submitting batch...")
+    #     batch = submit_and_wait_for_batch(
+    #         requests_jsonl,
+    #         endpoint="/v1/responses",
+    #         poll_interval=args.poll_interval,
+    #     )
+    #     print("Batch completed. Downloading outputs...")
+    #     download_batch_output(batch, results_jsonl)
 
-    print("Building final PMC_VQA_FULL dataset with modalities and conversations...")
-    pmc = build_pmc_multimodal_dataset(dataset, rats, split=split)
-    print(pmc)
+    # print("Parsing batch outputs for train...")
+    # rats = load_rationales_from_batch_output(results_jsonl)
+    # print(f"Collected rationales for train: {len(rats)} examples")
 
-    print(f"Saving dataset to {args.out_dir}")
-    pmc.save_to_disk(args.out_dir)
-    print("Done.")
+    # print("Building final PMC_VQA_FULL dataset with modalities and conversations...")
+    # pmc = build_pmc_multimodal_dataset(dataset, rats, split=split)
+    # print(pmc)
+
+    # print(f"Saving dataset to {args.out_dir}")
+    # pmc.save_to_disk(args.out_dir)
+    # print("Done.")
 
 
 if __name__ == "__main__":
