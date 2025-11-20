@@ -8,6 +8,7 @@ import os
 import json
 import time
 from typing import List, Dict, Tuple
+from openai import OpenAI
 from PIL import Image as PILImage
 from tqdm import tqdm
 
@@ -18,6 +19,9 @@ DATA_FILES = {
 
 ARCHIVE_URI = "hf://datasets/RadGenome/PMC-VQA/images.zip"
 MEMBER_PREFIX = "images/"
+
+# local image directory
+BASE_IMAGE_DIR = "/capstor/store/cscs/swissai/a127/homes/theoschiff/data/images"
 
 
 # === Utilities ===
@@ -99,7 +103,7 @@ def build_prompt(entry: dict) -> Tuple[str, Dict[str, str], str, str]:
     choices = extract_choices(entry)
     label, text = correct_label_and_text(entry, choices)
 
-    # User-facing question block with reserved token
+    # User-facing question block
     user_block = build_user_message_content(q, choices)
 
     prompt = (
@@ -180,6 +184,19 @@ def extract_output_text_from_response_obj(resp_obj: dict) -> str:
     return str(resp_obj).strip()
 
 
+def _entry_to_pil(entry_image):
+    """
+    Convert the image field from the dataset entry to a PIL.Image.
+    Handles dict from Image(decode=False) and direct paths.
+    """
+    if isinstance(entry_image, dict):
+        path = entry_image.get("path")
+        return PILImage.open(path)
+    if isinstance(entry_image, str):
+        return PILImage.open(entry_image)
+    return entry_image
+
+
 def create_batch_requests_file(
     dataset,
     split: str,
@@ -194,7 +211,7 @@ def create_batch_requests_file(
     with open(jsonl_path, "w", encoding="utf-8") as f:
         for idx, entry in tqdm(enumerate(dataset), total=len(dataset), desc="Building batch requests"):
             prompt, _, _, _ = build_prompt(entry)
-            pil_img = entry["image"]
+            pil_img = _entry_to_pil(entry["image"])
             _, data_url = image_to_bytes_and_data_url(pil_img)
 
             body = {
@@ -205,10 +222,11 @@ def create_batch_requests_file(
                         "content": [
                             {
                                 "type": "text",
-                                "text": ("You are a board-certified clinician and medical imaging expert. "
-                                          "You interpret a wide range of medical figures, including radiology (X-ray, CT, MRI, PET/CT, ultrasound, angiography), "
-                                          "nuclear medicine, endoscopy, histopathology, microscopy, ophthalmology (fundus and OCT), cardiology imaging, "
-                                          "and other biomedical figures or charts."
+                                "text": (
+                                    "You are a board-certified clinician and medical imaging expert. "
+                                    "You interpret a wide range of medical figures, including radiology (X-ray, CT, MRI, PET/CT, ultrasound, angiography), "
+                                    "nuclear medicine, endoscopy, histopathology, microscopy, ophthalmology (fundus and OCT), cardiology imaging, "
+                                    "and other biomedical figures or charts."
                                 ),
                             },
                         ],
@@ -235,15 +253,13 @@ def create_batch_requests_file(
 
 def submit_and_wait_for_batch(
     jsonl_path: str,
+    api_key: str = os.getenv("OPENAI_API_KEY"),
     endpoint: str = "/v1/responses",
     poll_interval: int = 3600,
 ):
     """
     Submit a batch job and block until it finishes.
     """
-    from openai import OpenAI
-
-    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set in environment.")
     client = OpenAI(api_key=api_key)
@@ -280,12 +296,10 @@ def submit_and_wait_for_batch(
     return batch
 
 
-def download_batch_output(batch, output_jsonl_path: str):
+def download_batch_output(batch, api_key: str, output_jsonl_path: str):
     """
     Download the batch output file to disk.
     """
-    from openai import OpenAI
-
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set in environment.")
@@ -327,25 +341,26 @@ def load_rationales_from_batch_output(output_jsonl_path: str) -> Dict[str, str]:
 
 def load_pmc_train_split(num_proc: int = 8):
     """
-    Load the PMC-VQA train split, attach remote zip image URLs,
-    and cast 'image' column to datasets.Image.
+    Load the PMC-VQA train split and map Figure_path to local image files.
     """
+    from datasets import load_dataset  # local import to avoid unused warning if not used
+
     ds = load_dataset("csv", data_files=DATA_FILES)
     dataset = ds["train"]
 
-    def to_remote_zip(example):
-        rel = example["Figure_path"]
-        zip_url = f"zip://{MEMBER_PREFIX}{rel}::{ARCHIVE_URI}"
-        example["raw_image_url"] = zip_url
-        example["image"] = zip_url
+    def to_local_path(example):
+        filename = os.path.basename(str(example["Figure_path"]))
+        local_path = os.path.join(BASE_IMAGE_DIR, filename)
+        example["raw_image_url"] = local_path
+        example["image"] = local_path
         return example
 
     dataset = dataset.map(
-        to_remote_zip,
-        desc="Linking figures in remote zip (train)",
+        to_local_path,
+        desc="Linking figures to local images (train)",
         num_proc=num_proc,
     )
-    dataset = dataset.cast_column("image", Image())
+    dataset = dataset.cast_column("image", Image(decode=False))
 
     cols = dataset.column_names
     for c in ["image", "raw_image_url"]:
@@ -378,7 +393,7 @@ def build_pmc_multimodal_dataset(
                 label, answer_text, rationale_only
             )
 
-            pil_img = entry["image"]
+            pil_img = _entry_to_pil(entry["image"])
             img_bytes, _ = image_to_bytes_and_data_url(pil_img)
             img_path = entry["raw_image_url"]
 
@@ -409,7 +424,7 @@ def build_pmc_multimodal_dataset(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Preprocess PMC-VQA train split into Multimediset format using the OpenAI Batch API."
+        description="Submit PMC-VQA OpenAI Batch jobs and download outputs."
     )
     parser.add_argument(
         "--gpt5_model", type=str, default="gpt-5.1", help="OpenAI model name"
@@ -435,7 +450,7 @@ def main():
     parser.add_argument(
         "--reuse_outputs",
         action="store_true",
-        help="If set, reuse existing batch results JSONL if present.",
+        help="If set, skip any shard that already has a corresponding results_*.jsonl.",
     )
     parser.add_argument(
         "--num_proc",
@@ -445,46 +460,64 @@ def main():
     )
 
     args = parser.parse_args()
-
     split = "train"
+
+
     os.makedirs(args.work_dir, exist_ok=True)
 
     print("Loading PMC-VQA train split...")
     dataset = load_pmc_train_split(num_proc=args.num_proc)
 
-    requests_jsonl = os.path.join(args.work_dir, "requests_train.jsonl")
-    results_jsonl = os.path.join(args.work_dir, "results_train.jsonl")
 
-    if args.reuse_outputs and os.path.exists(results_jsonl):
-        print(f"Reusing existing batch output for train: {results_jsonl}")
-    else:
-        print("Building batch requests file for train...")
-        create_batch_requests_file(
-            dataset, split, requests_jsonl, args.gpt5_model, args.max_output_tokens
-        )
-        print("Done building batch requests")
-
-
-    #     print("Submitting batch...")
-    #     batch = submit_and_wait_for_batch(
-    #         requests_jsonl,
-    #         endpoint="/v1/responses",
-    #         poll_interval=args.poll_interval,
+    api_key = os.getenv("OPENAI_API_KEY")
+    
+    # requests_jsonl = os.path.join(args.work_dir, "requests_train.jsonl")
+    # results_jsonl = os.path.join(args.work_dir, "results_train.jsonl")
+    # if args.reuse_outputs and os.path.exists(results_jsonl):
+    #     print(f"Reusing existing batch output for train: {results_jsonl}")
+    # else:
+    #     print("Building batch requests file for train...")
+    #     create_batch_requests_file(
+    #         dataset, split, requests_jsonl, args.gpt5_model, args.max_output_tokens
     #     )
-    #     print("Batch completed. Downloading outputs...")
-    #     download_batch_output(batch, results_jsonl)
+    #     print("Done building batch requests")
 
-    # print("Parsing batch outputs for train...")
-    # rats = load_rationales_from_batch_output(results_jsonl)
-    # print(f"Collected rationales for train: {len(rats)} examples")
+    # collect all request shards
+    all_files = [
+        f for f in os.listdir(args.work_dir)
+        if f.startswith("requests_train") and f.endswith(".jsonl")
+    ]
+    if not all_files:
+        raise RuntimeError(f"No requests_train*.jsonl files found in {args.work_dir}")
 
-    # print("Building final PMC_VQA_FULL dataset with modalities and conversations...")
-    # pmc = build_pmc_multimodal_dataset(dataset, rats, split=split)
-    # print(pmc)
+    all_files = sorted(all_files)
+    print("Found request shards:")
+    for f in all_files:
+        print("  ", f)
 
-    # print(f"Saving dataset to {args.out_dir}")
-    # pmc.save_to_disk(args.out_dir)
-    # print("Done.")
+    for fname in all_files:
+        req_path = os.path.join(args.work_dir, fname)
+
+        # suffix: "", "_00", "_01", ..., based on filename
+        # "requests_train_00.jsonl" -> "_00"
+        suffix = fname[len("requests_train"):-len(".jsonl")]
+        results_fname = f"results_train{suffix}.jsonl"
+        results_path = os.path.join(args.work_dir, results_fname)
+
+        if args.reuse_outputs and os.path.exists(results_path):
+            print(f"[SKIP] {fname} because {results_fname} already exists")
+            continue
+
+        print(f"\n=== Submitting batch for {fname} ===")
+        batch = submit_and_wait_for_batch(
+            req_path,
+            endpoint="/v1/responses",
+            poll_interval=args.poll_interval,
+        )
+        print(f"Batch for {fname} completed. Downloading outputs to {results_fname}...")
+        download_batch_output(batch, api_key, results_path)
+
+    print("\nAll request shards processed.")
 
 
 if __name__ == "__main__":
