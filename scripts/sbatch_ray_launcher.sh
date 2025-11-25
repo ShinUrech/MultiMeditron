@@ -31,13 +31,14 @@ set -e
 # Determine the stdout/stderr based on the CURRENT stdout stderr of this sbatch script
 REPORT_STDOUT_FILE="${REPORT_STDOUT_FILE:-$SLURM_JOB_ID.out}"
 REPORT_STDOUT_FILE="${REPORT_STDOUT_FILE%.out}-%t.log"
+REPORT_DIRECTORY=$(dirname "$REPORT_STDOUT_FILE")
 
 # Launch the Ray cluster using sbatch_ray_launcher_node.sh on multiple nodes
 srun \
     --chdir=$PWD \
     --output=$REPORT_STDOUT_FILE \
     --error=$REPORT_STDOUT_FILE \
-    --export=ALL \
+    --export=ALL,REPORT_DIRECTORY=$REPORT_DIRECTORY \
     "$SCRIPT_DIR/sbatch_ray_launcher_node.sh" $@
 
 echo "Ending job on $(date)"

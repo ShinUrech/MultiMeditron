@@ -21,7 +21,7 @@ def get_api_key(required: bool = False) -> str:
         raise ValueError("Environment variable 'SG_INFER_API_KEY' is not set.")
     return api_key
 
-def wait_for_sglang_server(address: str, timeout: int = 60):
+def wait_for_sglang_server(address: str, timeout: int = 600) -> None:
     start_time = time.time()
     with requests.Session() as session:
         while True:
@@ -39,7 +39,7 @@ def wait_for_sglang_server(address: str, timeout: int = 60):
 
             time.sleep(2)
 
-def create_async_client(required: bool = True) -> openai.AsyncClient:
+async def create_async_client(required: bool = True) -> openai.AsyncClient:
     # Get the SGLang server address from environment variable
     address = get_address(required=required)
     if address is None:

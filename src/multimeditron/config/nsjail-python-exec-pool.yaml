@@ -37,3 +37,4 @@ services:
     pool:
       parallelism: 16
       cpu_per_job: 1
+

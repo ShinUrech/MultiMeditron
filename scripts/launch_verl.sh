@@ -31,7 +31,7 @@ Options:
   --timeout <timeout>       (Optional) Job timeout in HH:MM:SS format. Default is '11:59:00'.
   --no-confirm              If set, skips the confirmation prompt before job submission.
   --debug                   (Optional) Launch the job in the debug partition instead of normal.
-  --launch-infer            (Optional) Launch a single node of inference in parallel to training.
+  --launch-infer <config>   (Optional) Launch a single node of inference in parallel to training.
   --recreate-venv           If set, recreate the venv and rerun the install script.
   --help                    (Optional) Display this help message and exit.
 EOF
@@ -218,7 +218,9 @@ if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
         $VENV_DIR
     source "$VENV_DIR/bin/activate"
 
-    pip install nvidia-ml-py sglang_router
+    pip install nvidia-ml-py 
+    # sglang_router
+    pip install deepspeed==0.17.0
     pip install -e .
     pip install -e third-party/verl
     pip install hf_transfer orjson openai_harmony
