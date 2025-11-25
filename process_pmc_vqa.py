@@ -8,7 +8,7 @@ import os
 import json
 import time
 from typing import List, Dict, Tuple
-from openai import OpenAI
+from openai import OpenAI, InternalServerError, APIConnectionError, RateLimitError
 from PIL import Image as PILImage
 from tqdm import tqdm
 
@@ -255,45 +255,67 @@ def submit_and_wait_for_batch(
     jsonl_path: str,
     api_key: str = os.getenv("OPENAI_API_KEY"),
     endpoint: str = "/v1/responses",
-    poll_interval: int = 3600,
 ):
     """
-    Submit a batch job and block until it finishes.
+    Submit a batch job (with retries on transient errors) and return the batch object.
     """
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set in environment.")
     client = OpenAI(api_key=api_key)
 
-    print(f"Uploading batch requests file: {jsonl_path}")
-    batch_input_file = client.files.create(
-        file=open(jsonl_path, "rb"), purpose="batch"
-    )
+    print(jsonl_path)
+
+    max_retries = 5
+    base_delay = 5  # seconds
+
+    # === robust files.create with exponential backoff ===
+    batch_input_file = None
+    for attempt in range(max_retries):
+        try:
+            with open(jsonl_path, "rb") as request_file:
+                batch_input_file = client.files.create(
+                    file=request_file,
+                    purpose="batch",
+                )
+            # success -> break out of retry loop
+            break
+        except (InternalServerError, APIConnectionError, RateLimitError) as e:
+            wait = base_delay * (2 ** attempt)
+            print(
+                f"[WARN] files.create failed for {jsonl_path} on attempt "
+                f"{attempt + 1}/{max_retries}: {e}"
+            )
+            if attempt == max_retries - 1:
+                print("[ERROR] Giving up on files.create after max retries.")
+                raise
+            print(f"Retrying in {wait} seconds...")
+            time.sleep(wait)
+
     print(f"Created input file: {batch_input_file.id}")
 
     batch = client.batches.create(
         input_file_id=batch_input_file.id,
         endpoint=endpoint,
         completion_window="24h",
+        metadata={
+                    "description": f"PMC-VQA batch for {os.path.basename(jsonl_path)}"
+                },
     )
     print(f"Created batch: {batch.id}, initial status: {batch.status}")
 
-    meta_path = os.path.join(os.path.dirname(jsonl_path), "batch_meta.json")
-    with open(meta_path, "w", encoding="utf-8") as mf:
-        json.dump({"batch_id": batch.id, "input_file_id": batch_input_file.id}, mf)
+    meta_path = os.path.join(os.path.dirname(jsonl_path), "batch_meta.jsonl")
 
-    terminal_states = {"completed", "failed", "expired", "cancelled"}
-    while batch.status not in terminal_states:
-        print(f"[Batch {batch.id}] Status: {batch.status} ... sleeping {poll_interval}s")
-        time.sleep(poll_interval)
-        batch = client.batches.retrieve(batch.id)
-
-    print(f"[Batch {batch.id}] Final status: {batch.status}")
-    if batch.status != "completed":
-        raise RuntimeError(
-            f"Batch {batch.id} did not complete successfully (status={batch.status})"
+    # save batch ID and input file ID
+    with open(meta_path, "a", encoding="utf-8") as mf:
+        mf.write(
+            json.dumps(
+                {"batch_id": batch.id, "input_file_id": batch_input_file.id}
+            )
+            + "\n"
         )
 
     return batch
+
 
 
 def download_batch_output(batch, api_key: str, output_jsonl_path: str):
@@ -429,7 +451,7 @@ def main():
     parser.add_argument(
         "--gpt5_model", type=str, default="gpt-5.1", help="OpenAI model name"
     )
-    parser.add_argument("--max_output_tokens", type=int, default=1024)
+    parser.add_argument("--max_output_tokens", type=int, default=2048)
     parser.add_argument(
         "--work_dir",
         type=str,
@@ -441,36 +463,23 @@ def main():
         type=str,
         default="/capstor/store/cscs/swissai/a127/meditron/multimediset/arrow/PMC_VQA_FULL",
     )
-    parser.add_argument(
-        "--poll_interval",
-        type=int,
-        default=3600,
-        help="Seconds between batch status polls (default: 3600 = 1h)",
-    )
-    parser.add_argument(
-        "--reuse_outputs",
-        action="store_true",
-        help="If set, skip any shard that already has a corresponding results_*.jsonl.",
-    )
-    parser.add_argument(
-        "--num_proc",
-        type=int,
-        default=8,
-        help="Number of processes for Dataset map().",
-    )
+
+    # parser.add_argument(
+    #     "--num_proc",
+    #     type=int,
+    #     default=8,
+    #     help="Number of processes for Dataset map().",
+    # )
 
     args = parser.parse_args()
-    split = "train"
 
 
     os.makedirs(args.work_dir, exist_ok=True)
 
     print("Loading PMC-VQA train split...")
-    dataset = load_pmc_train_split(num_proc=args.num_proc)
-
-
-    api_key = os.getenv("OPENAI_API_KEY")
     
+    # split = "train"
+    # dataset = load_pmc_train_split(num_proc=args.num_proc)
     # requests_jsonl = os.path.join(args.work_dir, "requests_train.jsonl")
     # results_jsonl = os.path.join(args.work_dir, "results_train.jsonl")
     # if args.reuse_outputs and os.path.exists(results_jsonl):
@@ -481,6 +490,7 @@ def main():
     #         dataset, split, requests_jsonl, args.gpt5_model, args.max_output_tokens
     #     )
     #     print("Done building batch requests")
+
 
     # collect all request shards
     all_files = [
@@ -504,18 +514,29 @@ def main():
         results_fname = f"results_train{suffix}.jsonl"
         results_path = os.path.join(args.work_dir, results_fname)
 
-        if args.reuse_outputs and os.path.exists(results_path):
-            print(f"[SKIP] {fname} because {results_fname} already exists")
+        start_time = time.time()
+        print(f"\n=== Submitting batch for {fname} ===")
+        try:
+            batch = submit_and_wait_for_batch(
+                req_path,
+                endpoint="/v1/responses",
+            )
+        except Exception as e:
+            elapsed = time.time() - start_time
+            print(
+                f"[ERROR] Failed to submit batch for {fname} after "
+                f"{elapsed:.2f} seconds: {e}"
+            )
             continue
 
-        print(f"\n=== Submitting batch for {fname} ===")
-        batch = submit_and_wait_for_batch(
-            req_path,
-            endpoint="/v1/responses",
-            poll_interval=args.poll_interval,
+        elapsed = time.time() - start_time
+        print(
+            f"Batch {batch.id} sent with status: {batch.status} "
+            f"(submission time: {elapsed:.2f} seconds)"
         )
-        print(f"Batch for {fname} completed. Downloading outputs to {results_fname}...")
-        download_batch_output(batch, api_key, results_path)
+
+        # print(f"Batch for {fname} completed. Downloading outputs to {results_fname}...")
+        # download_batch_output(batch, api_key, results_path)
 
     print("\nAll request shards processed.")
 
