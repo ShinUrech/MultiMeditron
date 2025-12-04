@@ -1,17 +1,15 @@
-#!/usr/bin/env python
-
-from datasets import load_dataset, Image, Dataset
 import argparse
 import base64
-from io import BytesIO
 import os
 import json
 import time
-from typing import List, Dict, Tuple
+import re
+from datasets import load_dataset, Image, Dataset
+from io import BytesIO
 from openai import OpenAI, InternalServerError, APIConnectionError, RateLimitError
 from PIL import Image as PILImage
 from tqdm import tqdm
-
+from typing import List, Dict, Tuple
 
 DATA_FILES = {
     "train": "https://huggingface.co/datasets/RadGenome/PMC-VQA/resolve/main/train.csv",
@@ -298,8 +296,8 @@ def submit_and_wait_for_batch(
         endpoint=endpoint,
         completion_window="24h",
         metadata={
-                    "description": f"PMC-VQA batch for {os.path.basename(jsonl_path)}"
-                },
+            "description": f"PMC-VQA batch for {os.path.basename(jsonl_path)}"
+        },
     )
     print(f"Created batch: {batch.id}, initial status: {batch.status}")
 
@@ -317,25 +315,67 @@ def submit_and_wait_for_batch(
     return batch
 
 
-
-def download_batch_output(batch, api_key: str, output_jsonl_path: str):
+def download_batch_outputs(log_path: str, work_dir: str, combined_output_jsonl_path: str):
     """
-    Download the batch output file to disk.
+    Download output files for all batch IDs found in the log, then
+    concatenate them into a single JSONL at combined_output_jsonl_path.
     """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set in environment.")
+
+    if not os.path.exists(log_path):
+        print(f"\nLog file {log_path} not found; skipping batch download from log.")
+        return
+
+    print(f"\nParsing batch IDs from log: {log_path}")
+    batch_ids = parse_batch_ids_from_log(log_path)
+    if not batch_ids:
+        print("No batch IDs found in log; nothing to download.")
+        return
+
+    print("Found batch IDs:")
+    for b in batch_ids:
+        print("  ", b)
+
     client = OpenAI(api_key=api_key)
 
-    os.makedirs(os.path.dirname(output_jsonl_path), exist_ok=True)
+    per_batch_files = []
 
-    if not getattr(batch, "output_file_id", None):
-        raise RuntimeError(f"Batch {batch.id} has no output_file_id")
+    for b in batch_ids:
+        try:
+            print(f"\nRetrieving batch {b}...")
+            batch = client.batches.retrieve(b)
+            print(f"Batch {b} status: {batch.status}")
+            print(batch.metadata)
 
-    print(f"Downloading batch output file {batch.output_file_id} -> {output_jsonl_path}")
-    response_stream = client.files.content(batch.output_file_id)
-    with open(output_jsonl_path, "wb") as f:
-        f.write(response_stream.read())
+            if getattr(batch, "output_file_id", None):
+                out_path = os.path.join(work_dir, f"{b}_results.jsonl")
+                print(f"Downloading batch output file {batch.output_file_id} -> {out_path}")
+
+                response_stream = client.files.content(batch.output_file_id)
+                with open(out_path, "wb") as f:
+                    f.write(response_stream.read())
+
+                print(f"Downloaded batch output to {out_path}")
+                per_batch_files.append(out_path)
+            else:
+                print(f"Batch {b} has no output_file_id yet; skipping download.")
+        except Exception as e:
+            print(f"[ERROR] Failed to download results for {b}: {e}")
+
+    # Concatenate all per-batch JSONLs into a single combined file
+    if per_batch_files:
+        os.makedirs(os.path.dirname(combined_output_jsonl_path), exist_ok=True)
+        print(f"\nConcatenating {len(per_batch_files)} batch result files into {combined_output_jsonl_path}")
+        with open(combined_output_jsonl_path, "w", encoding="utf-8") as out_f:
+            for fp in per_batch_files:
+                with open(fp, "r", encoding="utf-8") as in_f:
+                    for line in in_f:
+                        out_f.write(line)
+        print("Concatenation complete.")
+    else:
+        print("No batch output files were downloaded; combined file not created.")
 
 
 def load_rationales_from_batch_output(output_jsonl_path: str) -> Dict[str, str]:
@@ -444,6 +484,46 @@ def build_pmc_multimodal_dataset(
     return pmc
 
 
+def build_and_save_arrow_dataset_from_results(
+    results_jsonl_path: str,
+    out_dir: str,
+    num_proc: int = 8,
+    split: str = "train",
+):
+    """
+    Load combined batch results, build the multimodal dataset, and save it as Arrow to out_dir.
+    """
+    if not os.path.exists(results_jsonl_path):
+        print(f"Results JSONL {results_jsonl_path} not found; skipping Arrow build.")
+        return
+
+    print("\n=== Building Arrow dataset from batch outputs ===")
+    rats = load_rationales_from_batch_output(results_jsonl_path)
+    print(f"Loaded {len(rats)} rationales from {results_jsonl_path}")
+
+    print("Loading PMC-VQA train split...")
+    dataset = load_pmc_train_split(num_proc=num_proc)
+    print(f"Loaded PMC-VQA train split with {len(dataset)} examples")
+
+    pmc_dataset = build_pmc_multimodal_dataset(dataset, rats, split=split)
+
+    os.makedirs(out_dir, exist_ok=True)
+    print(f"Saving Arrow dataset to {out_dir} ...")
+    pmc_dataset.save_to_disk(out_dir)
+    print("Done saving Arrow dataset.")
+
+
+# === parse batch IDs from your log file ===
+def parse_batch_ids_from_log(log_path: str) -> List[str]:
+    """
+    Parse batch IDs (batch_[0-9a-f]+) from a given log file.
+    """
+    with open(log_path, "r") as f:
+        text = f.read()
+    batch_ids = sorted(set(re.findall(r"batch_[0-9a-f]+", text)))
+    return batch_ids
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Submit PMC-VQA OpenAI Batch jobs and download outputs."
@@ -463,21 +543,21 @@ def main():
         type=str,
         default="/capstor/store/cscs/swissai/a127/meditron/multimediset/arrow/PMC_VQA_FULL",
     )
-
-    # parser.add_argument(
-    #     "--num_proc",
-    #     type=int,
-    #     default=8,
-    #     help="Number of processes for Dataset map().",
-    # )
+    parser.add_argument(
+        "--log_path",
+        type=str,
+        default="/users/theoschiff/meditron/reports/multimeditron/preprocess/R-preprocess-pmc.1155463.out",
+        help="Log file containing batch IDs (batch_...).",
+    )
+    # parser.add_argument("--num_proc", type=int, default=8)
+    # parser.add_argument("--reuse_outputs", action="store_true")
 
     args = parser.parse_args()
-
 
     os.makedirs(args.work_dir, exist_ok=True)
 
     print("Loading PMC-VQA train split...")
-    
+
     # split = "train"
     # dataset = load_pmc_train_split(num_proc=args.num_proc)
     # requests_jsonl = os.path.join(args.work_dir, "requests_train.jsonl")
@@ -490,7 +570,6 @@ def main():
     #         dataset, split, requests_jsonl, args.gpt5_model, args.max_output_tokens
     #     )
     #     print("Done building batch requests")
-
 
     # collect all request shards
     all_files = [
@@ -516,29 +595,35 @@ def main():
 
         start_time = time.time()
         print(f"\n=== Submitting batch for {fname} ===")
-        try:
-            batch = submit_and_wait_for_batch(
-                req_path,
-                endpoint="/v1/responses",
-            )
-        except Exception as e:
-            elapsed = time.time() - start_time
-            print(
-                f"[ERROR] Failed to submit batch for {fname} after "
-                f"{elapsed:.2f} seconds: {e}"
-            )
-            continue
+
+        batch = submit_and_wait_for_batch(
+            req_path,
+            endpoint="/v1/responses",
+        )
 
         elapsed = time.time() - start_time
         print(
             f"Batch {batch.id} sent with status: {batch.status} "
             f"(submission time: {elapsed:.2f} seconds)"
         )
-
-        # print(f"Batch for {fname} completed. Downloading outputs to {results_fname}...")
-        # download_batch_output(batch, api_key, results_path)
+        # If want to download immediately (when done), you should call:
+        # download_batch_output(batch, results_path)
 
     print("\nAll request shards processed.")
+
+    # # === use log file to find batch IDs and download their output ===
+    # combined_results_path = os.path.join(args.work_dir, "combined_results_train.jsonl")
+    # print("\n=== Downloading batch outputs ===")
+    # download_batch_outputs(args.log_path, args.work_dir, combined_results_path)
+
+    # # === build Arrow dataset from combined results ===
+    # print("\n=== Building Arrow dataset and saving to disk ===")
+    # build_and_save_arrow_dataset_from_results(
+    #     combined_results_path,
+    #     args.out_dir,
+    #     num_proc=8,   
+    #     split="train",
+    # )
 
 
 if __name__ == "__main__":
