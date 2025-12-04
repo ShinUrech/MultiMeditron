@@ -105,14 +105,24 @@ def verl(ctx,
     os.environ["SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK"] = "1"
 
     if not ray.is_initialized():
+        # env_vars = os.environ.copy()
+        # env_vars["TOKENIZERS_PARALLELISM"] = "true"
+        # env_vars["NCCL_DEBUG"] = "INFO" if debug else "WARN"
+        # env_vars["VLLM_LOGGING_LEVEL"] = "INFO" if debug else "ERROR"
+        # env_vars["SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK"] = "1"
+        # env_vars["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
+
         kwargs = {
             "runtime_env": {
+                # "env_vars": env_vars,
                 "env_vars": {
                     "TOKENIZERS_PARALLELISM": "true",
                     "NCCL_DEBUG": "INFO" if debug else "WARN",
                     "VLLM_LOGGING_LEVEL": "INFO" if debug else "ERROR",
                     "SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK": "1",
                     "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO": "0",
+                    "NCCL_P2P_DISABLE": "1",
+                    "NCCL_SHM_DISABLE": "1",
                 },
                 "py_executable": sys.executable, # Use the same Python executable (notably for venvs)
             },

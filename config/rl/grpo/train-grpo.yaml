@@ -5,7 +5,7 @@ hydra:
 
 defaults:
   - verl_trainer
-  - verl_profiling
+  # - verl_profiling
   - nsjail-python-exec-pool
   - model/llama-3.1-8b
   - _self_
@@ -30,6 +30,7 @@ actor_rollout_ref:
     path: ${model.path}
     tokenizer_path: ${oc.select:model.tokenizer_path,model.path}
   rollout:
+    mode: sync
     log_prob_micro_batch_size_per_gpu: 2
     log_prob_max_token_len_per_gpu: 2048
     disable_log_stats: false

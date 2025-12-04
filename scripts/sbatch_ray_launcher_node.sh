@@ -6,11 +6,12 @@ set -e
 unset ROCR_VISIBLE_DEVICES # For some obscure reason this is set by CSCS environemtn
 unset {HTTP,HTTPS,FTP,NO}_PROXY # Same here, having those variable set (even empty) can mess up with some tools (looking at you curl)
 unset {http,https,ftp,no}_proxy # Same here, having those variable set (even empty) can mess up with some tools (looking at you curl)
-# export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0 # Prevent ray from overriding env vars set to 0
-# export TORCH_NCCL_TRACE_BUFFER_SIZE=1048576 # 1MB buffer for NCCL tracing
-# export NCCL_DEBUG=WARN # Enable NCCL debug tracing
-# export TORCH_DISTRIBUTED_DEBUG=DETAIL
+export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0 # Prevent ray from overriding env vars set to 0
 
+# Used for caching sglang cudagraphs (take long time on first run otherwise)
+export TORCHINDUCTOR_CACHE_DIR="$VENV_DIR/torchinductor_cache"
+
+# Load virtual environment
 echo "Activating virtual environment at $VENV_DIR"
 source "$VENV_DIR/bin/activate"
 
@@ -63,17 +64,17 @@ echo "Working directory: $(pwd)"
 echo "Environment variables: "
 
 # Export the environment variable for the INFER_ADDRESS if needed
-# if [[ ! -z "$INFER_CONFIG_PATH" ]]; then
-#     echo "INFER_HOST: $INFER_HOST"
-#     echo "INFER_PORT: $INFER_PORT"
+if [[ ! -z "$INFER_CONFIG_PATH" ]]; then
+    echo "INFER_HOST: $INFER_HOST"
+    echo "INFER_PORT: $INFER_PORT"
 
-#     export SG_INFER_ADDRESS=$(scontrol show hostnames $SLURM_NODELIST | head -n 2 | tail -n 1)
-#     export SG_INFER_ADDRESS="${SG_INFER_ADDRESS}:${INFER_PORT}"
-#     export SG_INFER_API_KEY="$INFER_API_KEY"
-#     echo "SG_INFER_ADDRESS: $SG_INFER_ADDRESS"
-#     echo "SG_INFER_API_KEY: $INFER_API_KEY"
-#     RAY_NNODE=$((SLURM_NNODES-1))
-# fi
+    export SG_INFER_ADDRESS=$(scontrol show hostnames $SLURM_NODELIST | head -n 2 | tail -n 1)
+    export SG_INFER_ADDRESS="${SG_INFER_ADDRESS}:${INFER_PORT}"
+    export SG_INFER_API_KEY="$INFER_API_KEY"
+    echo "SG_INFER_ADDRESS: $SG_INFER_ADDRESS"
+    echo "SG_INFER_API_KEY: $INFER_API_KEY"
+    RAY_NNODE=$((SLURM_NNODES-1))
+fi
 
 # Start ray HEAD node
 if [[ $SLURM_NODEID -eq 0 ]]; then
@@ -111,19 +112,19 @@ if [[ $SLURM_NODEID -eq 0 ]]; then
         ray stop
         exit 1
     fi
-# elif [[ $SLURM_NODEID -eq 1 && ! -z "$INFER_CONFIG_PATH" ]]; then
-#     # Sleep infinity and do something else
-#     echo "Starting INFERENCE node on http://$(hostname):$INFER_PORT"
+elif [[ $SLURM_NODEID -eq 1 && ! -z "$INFER_CONFIG_PATH" ]]; then
+    # Sleep infinity and do something else
+    echo "Starting INFERENCE node on http://$(hostname):$INFER_PORT"
 
-#     # Get the current bash file directory and run the parse_args.py script to get additional args
-#     CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-#     echo "Current path: $CURRENT_PATH"
-#     additional_args=$(python $CURRENT_PATH/parse_args.py $INFER_CONFIG_PATH)
+    # Get the current bash file directory and run the parse_args.py script to get additional args
+    CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    echo "Current path: $CURRENT_PATH"
+    additional_args=$(python $CURRENT_PATH/parse_args.py $INFER_CONFIG_PATH)
 
-#     # Start inference server
-#     cmd="python3 -m sglang.launch_server $additional_args --host $INFER_HOST --port $INFER_PORT --api-key \"$INFER_API_KEY\""
-#     echo "Running command $cmd"
-#     $cmd
+    # Start inference server
+    cmd="python3 -m sglang.launch_server $additional_args --host $INFER_HOST --port $INFER_PORT --api-key $INFER_API_KEY"
+    echo "Running command $cmd"
+    $cmd
 else
     # Sleep to ensure the head node starts before workers try to connect
     sleep 2
@@ -149,31 +150,33 @@ ENV_FILE="${REPORT_DIRECTORY:-./}/ray-${SLURM_JOB_ID}-environment.txt"
 env > "$ENV_FILE"
 
 # If inference server is running on node 1, wait a bit to ensure it's up
-# if [[ ! -z "$INFER_CONFIG_PATH" ]]; then
-#     echo "Waiting for inference server to be ready..."
-#     infer_timeout=900 # 15 minutes to wait for inference server
-#     infer_interval=10 # Check every 10 seconds
-#     ncount=0
+if [[ ! -z "$INFER_CONFIG_PATH" ]]; then
+    echo "Waiting for inference server to be ready..."
+    infer_timeout=900 # 15 minutes to wait for inference server
+    infer_interval=10 # Check every 10 seconds
+    ncount=0
     
-#     now=$(date +%s)
-#     while true; do
-#         ncount=$((ncount+1))
-#         # if curl -s "http://$SG_INFER_ADDRESS/health" | grep -q "OK"; then
-#         if curl -o - -s -w "%{http_code}" "http://$SG_INFER_ADDRESS/health" | grep -q "200"; then
-#             echo "Inference server is ready!"
-#             break
-#         else
-#             echo "Inference server not ready yet (check #$ncount). Retrying in $infer_interval seconds..."
-#             sleep $infer_interval
-#         fi
+    now=$(date +%s)
+    while true; do
+        ncount=$((ncount+1))
+        # if curl -s "http://$SG_INFER_ADDRESS/health" | grep -q "OK"; then
+        if curl -o - -s -w "%{http_code}" "http://$SG_INFER_ADDRESS/health" | grep -q "200"; then
+            echo "Inference server is ready!"
+            break
+        else
+            echo "Inference server not ready yet (check #$ncount). Retrying in $infer_interval seconds..."
+            sleep $infer_interval
+        fi
         
-#         if (( $(date +%s) - now > infer_timeout )); then
-#             echo "Error: Inference server did not become ready within $infer_timeout seconds. Exiting."
-#             ray stop
-#             exit 1
-#         fi
-#     done
-# fi
+        if (( $(date +%s) - now > infer_timeout )); then
+            echo "Error: Inference server did not become ready within $infer_timeout seconds. Exiting."
+            ray stop
+            exit 1
+        fi
+    done
+
+    sleep 10 # Extra sleep to ensure stability
+fi
 
 echo "Running training script on $(hostname)"
 echo "Running command: $SCRIPT_COMMAND"

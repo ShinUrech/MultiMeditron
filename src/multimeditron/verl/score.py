@@ -1,7 +1,9 @@
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 from multimeditron.verl.score_utils import *
 from multimeditron.verl.infer import create_async_client
 import json
+# if TYPE_CHECKING:
+#     from openai.types.chat import ChatCompletion
 
 
 SCORE_REGISTRY = {}
@@ -38,18 +40,19 @@ async def compute_score(
     print(ground_truth)
     print(extra_info)
 
-    client = create_async_client(required=False)
+    client = await create_async_client(required=False)
     if client is None:
         print("No SGLang server configured, skipping score computation.")
     else:
         print("SGLang server client created.")
 
     # 1. Formating score
+    score = 0.0
     score += 0.2 * markdown_simple_reward(solution_str)
     score += 0.2 * markdown_check_references(solution_str, lambda _: False)
 
     # 2. Content score
-    assert client is not None
+    assert client is not None, "SGLang client should be available for content scoring."
     prompt = f"""
     You are a helpful assistant that evaluates the correctness of answers to questions.
 
@@ -69,13 +72,15 @@ async def compute_score(
     Correct Answer: {ground_truth}
     Provided Answer: {solution_str}
     """
-    response = await client.completions.create(prompt)
+    response = await client.completions.create(
+        model="meta-llama/Llama-3.3-70B-Instruct",
+        prompt=prompt,
+    )
     print("=== Prompt sent to SGLang server for scoring ===")
     print("Prompt:", prompt)
     print("SGLang response:", response)
 
     # Attempt to parse the response
-    score = 0.0
     try:
         response_json_str = response.split("ANSWER:")[-1].strip()
 

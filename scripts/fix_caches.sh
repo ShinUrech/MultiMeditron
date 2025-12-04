@@ -44,7 +44,7 @@ TARGETS=(
     "~/.local/share/virtualenv"
     "~/.local/lib/python*"
     "/tmp/*"
-    "/capstor/store/cscs/swissai/a127/homes/$(whoami)"
+    "/capstor/store/cscs/swissai/a127/homes/$USER/hf*"
 )
 
 for TARGET in "${TARGETS[@]}"; do

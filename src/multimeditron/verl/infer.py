@@ -50,6 +50,8 @@ async def create_async_client(required: bool = True) -> openai.AsyncClient:
     api_key = get_api_key()
     if api_key is not None:
         kwargs["api_key"] = api_key
+    print("Creating SGLang async client with address:", address)
+    print("Using API key:", api_key)
 
     # Create the OpenAI client
     client = openai.AsyncClient(base_url=f"http://{address}/v1", **kwargs)
