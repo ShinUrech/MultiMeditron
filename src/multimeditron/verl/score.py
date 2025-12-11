@@ -1,9 +1,9 @@
 from typing import Dict, TYPE_CHECKING
 from multimeditron.verl.score_utils import *
 from multimeditron.verl.infer import create_async_client
+import re
 import json
-# if TYPE_CHECKING:
-#     from openai.types.chat import ChatCompletion
+from rapidfuzz import fuzz
 
 
 SCORE_REGISTRY = {}
@@ -27,102 +27,110 @@ def compute_score_router(
 ):
     pass
 
-@register_score("debug_score")
+def extract_sections(text: str):
+    pattern_diag = r"-\s*Diagnosis:\s*(.*?)(?=\n\s*-\s*Treatment\s*:|\Z)"
+    pattern_treat = r"-\s*Treatment:\s*(.*?)(?=\Z)"
+    diag = re.search(pattern_diag, text, re.I | re.S)
+    treat = re.search(pattern_treat, text, re.I | re.S)
+    return (diag.group(1).strip() if diag else "",
+            treat.group(1).strip() if treat else "")
+
+
+def score_format(solution_str: str):
+    lines = [ln.strip() for ln in solution_str.splitlines() if ln.strip()]
+    
+    has_diag = any(re.match(r"-\s*diagnosis:\s+.+", ln, re.I) for ln in lines)
+    has_treat = any(re.match(r"-\s*treatment:\s+.+", ln, re.I) for ln in lines)
+
+    if not has_diag or not has_treat:
+        return 0.0
+
+    return 1.0
+
+
+@register_score("medical_llm_judge_score")
 async def compute_score(
     data_source: str,
     solution_str: str,
-    ground_truth: str,
+    ground_truth: dict,
     extra_info: dict,
 ):
-    # Retrieve the response and check if it is the correct format (use a regex)
-    print(data_source)
-    print(solution_str)
-    print(ground_truth)
-    print(extra_info)
+    print("============ Debug ============")
+    print("Solution:", solution_str)
+    print("Ground truth:", ground_truth)
+    print("Extra:", extra_info)
+
+    format_score = score_format(solution_str)
+
+    pred_diag, pred_treat = extract_sections(solution_str)
+    true_diag = ground_truth.get("diagnosis", "")
+    true_treat = ground_truth.get("treatment", "")
 
     client = await create_async_client(required=False)
     if client is None:
-        print("No SGLang server configured, skipping score computation.")
-    else:
-        print("SGLang server client created.")
+        print("No SGLang server. Score = 0.0")
+        return 0.0
 
-    # 1. Formating score
-    score = 0.0
-    score += 0.2 * markdown_simple_reward(solution_str)
-    score += 0.2 * markdown_check_references(solution_str, lambda _: False)
-
-    # 2. Content score
-    assert client is not None, "SGLang client should be available for content scoring."
     prompt = f"""
-    You are a helpful assistant that evaluates the correctness of answers to questions.
+    You are an expert medical evaluator.
 
-    Given the question, the correct answer, and the provided answer, please grade the following
-    - capacity to speak fluently and coherently (possible values: Poor, Fair, Good, Excellent)
-    - correctness of the answer (possible values: Incorrect, Partially Correct, Mostly Correct, Correct)
-    - correctness of the reasoning steps (possible values: Incorrect, Partially Correct, Mostly Correct, Correct)
-    Provide your answer in the following JSON format (prefixed by "ANSWER:"):
+    Score the model output from 0.0 to 1.0 for:
+    - Diagnosis correctness
+    - Treatment correctness
+    - Reasoning quality (logical and coherent)
 
-    ANSWER: {{
-        "fluency": "<value>",
-        "answer_correctness": "<value>",
-        "reasoning_correctness": "<value>"
-    }}
+    Ground truth: Diagnosis: {true_diag} | Treatment: {true_treat}
+    Prediction: Diagnosis: {pred_diag} | Treatment: {pred_treat}
 
-    Question: {extra_info.get("question", "N/A")}
-    Correct Answer: {ground_truth}
-    Provided Answer: {solution_str}
+    Output your explanation for the score and what the model did well/badly and final score in the format below:
+
+    Explanation: <your explanation here>
+    Answer: <float between 0.0 and 1.0>
+
+    Do not include any other text outside the specified format.
     """
-    response = await client.completions.create(
-        model="meta-llama/Llama-3.3-70B-Instruct",
-        prompt=prompt,
+
+    response = await client.chat.completions.create(
+        model="Qwen/Qwen3-30B-A3B-Instruct-2507",
+        messages=[
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.3,
+        extra_body={
+        "chat_template_kwargs": {"enable_thinking": False}
+        },
+        max_tokens=256,
     )
-    print("=== Prompt sent to SGLang server for scoring ===")
-    print("Prompt:", prompt)
-    print("SGLang response:", response)
 
-    # Attempt to parse the response
+
+    print("============ LLM Judge Response ============")
+    print(response)
+
     try:
-        response_json_str = response.split("ANSWER:")[-1].strip()
+        llm_text = response.choices[0].message.content
 
-        # Try to find the first and last curly braces to extract JSON
-        first_brace = response_json_str.find("{")
-        last_brace = response_json_str.rfind("}")
-        if first_brace == -1 or last_brace == -1 or last_brace <= first_brace:
-            raise ValueError("Could not find valid JSON in the response.")
-        else:
-            response_json_str = response_json_str[first_brace:last_brace+1]
-            response_json = json.loads(response_json_str)
-            fluency = response_json.get("fluency", "Poor")
-            answer_correctness = response_json.get("answer_correctness", "Incorrect")
-            reasoning_correctness = response_json.get("reasoning_correctness", "Incorrect")
+        print("============ Extracted Text ============")
+        print(llm_text)
 
-            fluency_scores = {
-                "Poor": 0.0,
-                "Fair": 0.33,
-                "Good": 0.66,
-                "Excellent": 1.0,
-            }
-            correctness_scores = {
-                "Incorrect": 0.0,
-                "Partially Correct": 0.33,
-                "Mostly Correct": 0.66,
-                "Correct": 1.0,
-            }
+        if "Answer:" not in llm_text:
+            raise ValueError("Answer missing")
 
-            score += 0.3 * fluency_scores.get(fluency, 0.0)
-            score += 0.35 * correctness_scores.get(answer_correctness, 0.0)
-            score += 0.15 * correctness_scores.get(reasoning_correctness, 0.0)
+        after = llm_text.split("Answer:")[-1].strip()
+        score_str = after.split()[0].strip()
+
+        final_score = float(score_str)
+        final_score = max(0.0, min(1.0, final_score))
+
     except Exception as e:
-        print(f"Error parsing response JSON: {e}")
-        score += 0.5
+        print("Judge answer parsing error", e)
+        print("Fallback score = 0.25")
+        return 0.25
 
-    # response = solution_str
-    # response_lower = response.lower()
-    # score = response_lower.count("a") / len(response_lower) if len(response_lower) > 0 else 0
-    # print(f"Score: {score}")
+    final_reward = 0.10 * format_score + 0.90 * final_score
 
-    return {
-        "score": score,
-        "acc": 0.0,
-        "pred": "Maybe",
-    }
+    print("============ Final Reward Breakdown ============")
+    print("Format:", format_score)
+    print("Judge score:", final_score)
+    print("Final score:", final_reward)
+
+    return final_reward
