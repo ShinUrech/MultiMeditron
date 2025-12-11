@@ -32,6 +32,17 @@ def _normalize_choice(text: str) -> str:
 
 
 def extract_choices(entry: dict) -> Dict[str, str]:
+    """
+    Extract and normalize the multiple-choice options from the dataset entry.
+    Returns a dict mapping "A", "B", "C", "D" to the
+    corresponding choice text.
+
+    ### Args
+    * entry: A dictionary representing a dataset entry.
+    ### Returns
+    * A dictionary mapping choice labels ("A", "B", "C", "D") to their text.
+    """
+
     return {
         "A": _normalize_choice(entry.get("Choice A", "")),
         "B": _normalize_choice(entry.get("Choice B", "")),
@@ -41,16 +52,40 @@ def extract_choices(entry: dict) -> Dict[str, str]:
 
 
 def correct_label_and_text(entry: dict, choices: Dict[str, str]) -> Tuple[str, str]:
+    """
+    Get the correct answer label and corresponding text from the dataset entry.
+    ### Args
+    * entry: A dictionary representing a dataset entry.
+    * choices: A dictionary mapping choice labels to their text.
+
+    ### Returns
+    * A tuple containing the correct answer label and corresponding text.
+    """
     label = str(entry.get("Answer_label", "")).strip()
     text = choices.get(label) or str(entry.get("Answer", "")).strip()
     return label, text
 
 
 def block_header(i: int) -> str:
+    """
+    Generate a header string for question i (0-based).
+    ### Args
+    * i: The index of the question (0-based).
+    ### Returns
+    * A formatted header string.
+    """
     return f"Question {i+1}"
 
 
 def format_question(q: str, choices: Dict[str, str]) -> str:
+    """
+    Format the question and choices into a string.
+    ### Args
+    * q: The question text.
+    * choices: A dictionary mapping choice labels to their text.
+    ### Returns
+    * A formatted string containing the question and its choices.
+    """
     lines = [f"Question: {q}", "Options:"]
     for k in ["A", "B", "C", "D"]:
         v = choices.get(k)
@@ -60,15 +95,38 @@ def format_question(q: str, choices: Dict[str, str]) -> str:
 
 
 def format_rationale(label: str, rationale: str) -> str:
+    """
+    Format the rationale string with the correct label.
+    ### Args
+    * label: The correct answer label.
+    * rationale: The rationale text.
+    ### Returns
+    * A formatted string containing the rationale.
+    """
     return f"Rationale ({label}):\n{rationale.strip()}"
 
 
 def format_correct(label: str, text: str) -> str:
+    """
+    Format the correct answer string.
+    ### Args
+    * label: The correct answer label.
+    * text: The correct answer text.
+    ### Returns
+    * A formatted string containing the correct answer.
+    """
     pretty = f"{label} — {text}" if text else label
     return f"Correct Answer: {pretty}"
 
 
 def parse_model_output_for_rationale(generation: str) -> str:
+    """
+    Parse the model's generation to extract the rationale text.
+    ### Args
+    * generation: The raw generation text from the model.
+    ### Returns
+    * The extracted rationale text.
+    """
     gen = generation.strip()
     low = gen.lower()
     if "rationale:" in low:
@@ -84,6 +142,11 @@ def parse_model_output_for_rationale(generation: str) -> str:
 def build_user_message_content(question: str, choices: Dict[str, str]) -> str:
     """
     Build the user message with the reserved special token.
+    ### Args
+    * question: The question text.
+    * choices: A dictionary mapping choice labels to their text.
+    ### Returns
+    * A formatted string for the user message content.
     """
     lines = ["Based on the image, answer the question:", question.strip()]
     for k in ["A", "B", "C", "D"]:
@@ -138,6 +201,10 @@ def maybe_downscale(pil_img, max_side: int = 1280):
 
 
 def image_to_bytes_and_data_url(pil_img, fmt="JPEG", quality=90):
+    """
+    Convert a PIL.Image to bytes and a data URL.
+    Downscale the image if its largest side exceeds max_side.
+    """
     pil_img = maybe_downscale(pil_img)
     buf = BytesIO()
     pil_img.convert("RGB").save(buf, format=fmt, quality=quality)
@@ -148,6 +215,9 @@ def image_to_bytes_and_data_url(pil_img, fmt="JPEG", quality=90):
 
 
 def build_assistant_message_content(label: str, answer_text: str, rationale_only: str) -> str:
+    """
+    Build the assistant message content with rationale and final answer.
+    """
     rationale_only = rationale_only.strip()
     parts = []
     if rationale_only:
@@ -204,6 +274,12 @@ def create_batch_requests_file(
 ):
     """
     Write one JSONL batch request file for the train split.
+    ### Args
+    * dataset: The Dataset object for the split.
+    * split: The dataset split name (e.g., "train").
+    * jsonl_path: Path to save the JSONL requests file.
+    * gpt5_model: The OpenAI GPT-5 model name to use.
+    * max_output_tokens: Maximum output tokens for the model.
     """
     os.makedirs(os.path.dirname(jsonl_path), exist_ok=True)
     with open(jsonl_path, "w", encoding="utf-8") as f:
@@ -256,6 +332,12 @@ def submit_and_wait_for_batch(
 ):
     """
     Submit a batch job (with retries on transient errors) and return the batch object.
+    ### Args
+    * jsonl_path: Path to the JSONL requests file.
+    * api_key: OpenAI API key.
+    * endpoint: The API endpoint for the batch (default: "/v1/responses").
+    ### Returns
+    * The created batch object.
     """
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set in environment.")
@@ -319,6 +401,10 @@ def download_batch_outputs(log_path: str, work_dir: str, combined_output_jsonl_p
     """
     Download output files for all batch IDs found in the log, then
     concatenate them into a single JSONL at combined_output_jsonl_path.
+    ### Args
+    * log_path: Path to the log/out file containing batch IDs.
+    * work_dir: Directory to save per-batch output files.
+    * combined_output_jsonl_path: Path to save the combined JSONL output.
     """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -342,7 +428,7 @@ def download_batch_outputs(log_path: str, work_dir: str, combined_output_jsonl_p
 
     per_batch_files = []
 
-    for b in batch_ids:
+    for b in tqdm(batch_ids):
         try:
             print(f"\nRetrieving batch {b}...")
             batch = client.batches.retrieve(b)
@@ -381,6 +467,10 @@ def download_batch_outputs(log_path: str, work_dir: str, combined_output_jsonl_p
 def load_rationales_from_batch_output(output_jsonl_path: str) -> Dict[str, str]:
     """
     Parse the batch output JSONL and return {custom_id: raw_generation_text}.
+    ### Args
+    * output_jsonl_path: Path to the batch output JSONL file.
+    ### Returns
+    * A dictionary mapping custom IDs to their corresponding raw generation text.
     """
     mapping: Dict[str, str] = {}
     with open(output_jsonl_path, "r", encoding="utf-8") as f:
@@ -439,6 +529,12 @@ def build_pmc_multimodal_dataset(
 ) -> Dataset:
     """
     Build the final Dataset with columns ['modalities', 'conversations'].
+    ### Args
+    * dataset: The Dataset object for the split.
+    * rats: A dictionary mapping custom IDs to rationale texts.
+    * split: The dataset split name (e.g., "train").
+    ### Returns
+    * A Dataset object with the multimodal data.
     """
     def gen():
         for idx, entry in enumerate(dataset):
@@ -546,11 +642,11 @@ def main():
     parser.add_argument(
         "--log_path",
         type=str,
-        default="/users/theoschiff/meditron/reports/multimeditron/preprocess/R-preprocess-pmc.1155463.out",
+        default="/users/theoschiff/meditron/reports/multimeditron/preprocess/R-preprocess-pmc.1189244.out",
         help="Log file containing batch IDs (batch_...).",
     )
-    # parser.add_argument("--num_proc", type=int, default=8)
-    # parser.add_argument("--reuse_outputs", action="store_true")
+    parser.add_argument("--num_proc", type=int, default=8)
+    parser.add_argument("--reuse_outputs", action="store_true")
 
     args = parser.parse_args()
 
@@ -558,18 +654,18 @@ def main():
 
     print("Loading PMC-VQA train split...")
 
-    # split = "train"
-    # dataset = load_pmc_train_split(num_proc=args.num_proc)
-    # requests_jsonl = os.path.join(args.work_dir, "requests_train.jsonl")
-    # results_jsonl = os.path.join(args.work_dir, "results_train.jsonl")
-    # if args.reuse_outputs and os.path.exists(results_jsonl):
-    #     print(f"Reusing existing batch output for train: {results_jsonl}")
-    # else:
-    #     print("Building batch requests file for train...")
-    #     create_batch_requests_file(
-    #         dataset, split, requests_jsonl, args.gpt5_model, args.max_output_tokens
-    #     )
-    #     print("Done building batch requests")
+    split = "train"
+    dataset = load_pmc_train_split(num_proc=args.num_proc)
+    requests_jsonl = os.path.join(args.work_dir, "requests_train.jsonl")
+    results_jsonl = os.path.join(args.work_dir, "results_train.jsonl")
+    if args.reuse_outputs and os.path.exists(results_jsonl):
+        print(f"Reusing existing batch output for train: {results_jsonl}")
+    else:
+        print("Building batch requests file for train...")
+        create_batch_requests_file(
+            dataset, split, requests_jsonl, args.gpt5_model, args.max_output_tokens
+        )
+        print("Done building batch requests")
 
     # collect all request shards
     all_files = [
@@ -611,6 +707,7 @@ def main():
 
     print("\nAll request shards processed.")
 
+    """TO RUN AFTER ALL BATCHES ARE SUBMITTED AND COMPLETED:"""
     # # === use log file to find batch IDs and download their output ===
     # combined_results_path = os.path.join(args.work_dir, "combined_results_train.jsonl")
     # print("\n=== Downloading batch outputs ===")
