@@ -1,0 +1,25 @@
+# SGLang server/runtime args: https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/server_args.py
+engine:
+  model_path: Qwen/Qwen3-Next-80B-A3B-Instruct   # <- your requested model
+  tp_size: 4                                     # tensor parallel
+  dp_size: 1                                     # data parallel
+  # Optional knobs you can enable/tune as appropriate:
+  # max_batch_size: 32
+  # max_model_len: 32768
+  # kv_cache_dtype: "fp8_e5m2"   # or "fp8_e4m3" / "fp16" depending on your hardware
+  # dtype: "auto"                # let SGLang pick best-available
+  # trust_remote_code: true      # for some model repos that need it
+  # tokenizer_mode: "auto"
+  # gpu_mem_utilization: 0.90
+  # block_size: 16
+  # enable_prefix_caching: true
+  # attention_backend: "flashinfer"  # or "torch" if needed
+
+sampling_params:
+  temperature: 0.0
+  top_p: 1.0
+  max_new_tokens: 2048
+  # SGLang also supports:
+  # stop: []
+  # frequency_penalty: 0.0
+  # presence_penalty: 0.0
