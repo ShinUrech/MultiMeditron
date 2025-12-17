@@ -56,7 +56,7 @@ async def compute_score(
     extra_info: dict,
 ):
     print("============ Debug ============")
-    print("Solution:", solution_str)
+    print("Model's Solution:", solution_str)
     print("Ground truth:", ground_truth)
     print("Extra:", extra_info)
 
@@ -74,10 +74,18 @@ async def compute_score(
     prompt = f"""
     You are an expert medical evaluator.
 
-    Score the model output from 0.0 to 1.0 for:
+    Score the model output:
+    - A if it is fully correct
+    - B if it is mostly correct with minor issues
+    - C if it has some correct parts but also significant errors
+    - D if it is mostly incorrect
+    - F if it is completely wrong or irrelevant
+
+    Consider the following aspects:
     - Diagnosis correctness
     - Treatment correctness
-    - Reasoning quality (logical and coherent)
+
+    Give a score for diagnosis and treatment seperately. 
 
     Ground truth: Diagnosis: {true_diag} | Treatment: {true_treat}
     Prediction: Diagnosis: {pred_diag} | Treatment: {pred_treat}
@@ -85,9 +93,41 @@ async def compute_score(
     Output your explanation for the score and what the model did well/badly and final score in the format below:
 
     Explanation: <your explanation here>
-    Answer: <float between 0.0 and 1.0>
+    Answer: Treatment score (A-F), Diagnosis score (A-F)
 
     Do not include any other text outside the specified format.
+    """
+
+    prompt2= f"""
+        You are an expert medical response evaluator. Your task is to provide a single, holistic quality assessment of a predicted response against the authoritative ground truth.
+
+        Criteria for Evaluation:
+        1.  **Completeness:** Does the predicted response address both the Diagnosis and Treatment sections as required by the ground truth?
+        2.  **Consistency:** Are the diagnosis and treatment logically consistent with each other and the underlying condition?
+        3.  **Clarity and Flow:** Is the response well-structured, easy to understand, and professionally presented?
+        4.  **Overall Accuracy:** Considering all elements, how closely does the predicted response match the intent and factual correctness of the ground truth?
+
+        Score the model output:
+            - A if it is fully correct
+            - B if it is mostly correct with minor issues
+            - C if it has some correct parts but also significant errors
+            - D if it is mostly incorrect
+            - F if it is completely wrong or irrelevant
+        ---
+        Ground Truth Diagnosis: {true_diag}
+        Ground Truth Treatment: {true_treat}
+        Ground Truth Reasoning: {ground_truth.get("reasoning", "")}
+
+        Predicted Response (Full Text):
+        {solution_str}
+        ---
+
+        Output your evaluation in the exact format below, including a detailed justification for the chosen grade.
+
+        Explanation: <Your detailed reasoning, addressing all four criteria>
+        Final Grade: <A, B, C, D, or F>
+
+        Do not output anything after the final grade is given. 
     """
 
     response = await client.chat.completions.create(
@@ -95,42 +135,98 @@ async def compute_score(
         messages=[
             {"role": "user", "content": prompt},
         ],
-        temperature=0.3,
+        temperature=0.0,
         extra_body={
         "chat_template_kwargs": {"enable_thinking": False}
         },
-        max_tokens=256,
+        max_tokens=512
+    )
+
+    response2 = await client.chat.completions.create(
+        model="Qwen/Qwen3-30B-A3B-Instruct-2507",
+        messages=[
+            {"role": "user", "content": prompt2},
+        ],
+        temperature=0.0,
+        extra_body={
+        "chat_template_kwargs": {"enable_thinking": False}
+        },
+        max_tokens=5123
     )
 
 
     print("============ LLM Judge Response ============")
+    print("Response about treatment and diagnosis:\n")
     print(response)
+    print("Response about holistic evaluation:\n")
+    print(response2)
+
+
+
+    GRADE_TO_SCORE = {
+    "A": 1.0,
+    "B": 0.75,
+    "C": 0.5,
+    "D": 0.25,
+    "F": 0.0
+    }
 
     try:
         llm_text = response.choices[0].message.content
 
-        print("============ Extracted Text ============")
+        print("============ Diagnosis/Treatment Judge Text ============")
         print(llm_text)
 
         if "Answer:" not in llm_text:
-            raise ValueError("Answer missing")
+            treatment_grade = "D"
+            diagnosis_grade = "D"
+        else:
+            after = llm_text.split("Answer:")[-1].strip()
+            grades = re.findall(r"\b[A-F]\b", after)
 
-        after = llm_text.split("Answer:")[-1].strip()
-        score_str = after.split()[0].strip()
+            # if len(grades) != 2:
+            #     treatment_grade = "C"
+            #     diagnosis_grade = "C
 
-        final_score = float(score_str)
-        final_score = max(0.0, min(1.0, final_score))
+            try:
+                treatment_grade, diagnosis_grade = grades
+            except:
+                treatment_grade = "D"
+                diagnosis_grade = "D"
+
+            valid_grades = {"A", "B", "C", "D", "F"}
+            if treatment_grade not in valid_grades or diagnosis_grade not in valid_grades:
+                treatment_grade = "D"
+                diagnosis_grade = "D"
 
     except Exception as e:
-        print("Judge answer parsing error", e)
-        print("Fallback score = 0.25")
-        return 0.25
+        treatment_grade = "D"
+        diagnosis_grade = "D"
 
-    final_reward = 0.10 * format_score + 0.90 * final_score
+    try:
+        llm_text2 = response2.choices[0].message.content
+        print("============ Holistic Judge Text ============")
+        print(llm_text2)
+        match = re.search(r"Final Grade:\s*([A-F])", llm_text2)
+        if match:
+            holistic_grade = match.group(1)
+        else:
+            holistic_grade = "D"
+    except Exception as e2:
+        holistic_grade = "D"
+
+
+    numeric_holistic = GRADE_TO_SCORE[holistic_grade]
+    numeric_treatment = GRADE_TO_SCORE[treatment_grade]
+    numeric_diagnosis = GRADE_TO_SCORE[diagnosis_grade]
+
+
+    final_reward = 0.10 * format_score + (0.45 * numeric_treatment + 0.45 * numeric_diagnosis + 0.9 * numeric_holistic)/2
 
     print("============ Final Reward Breakdown ============")
     print("Format:", format_score)
-    print("Judge score:", final_score)
+    print(f"Judge answer score: Treatment {treatment_grade} ({numeric_treatment}), Diagnosis {diagnosis_grade} ({numeric_diagnosis})")
+    print(f"Judge holistic score: {holistic_grade} ({numeric_holistic})")
     print("Final score:", final_reward)
 
     return final_reward

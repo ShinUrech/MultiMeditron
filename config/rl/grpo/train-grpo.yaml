@@ -7,7 +7,7 @@ defaults:
   - verl_trainer
   # - verl_profiling
   - nsjail-python-exec-pool
-  - model/llama-3.1-8b
+  - model/llama-3.1-8b 
   - _self_
 
 data:
@@ -17,10 +17,14 @@ data:
   train_batch_size: 16
   val_batch_size: 8
   return_raw_chat: true
+  # train_files:
+  #   - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd.parquet
+  # val_files:
+  #   - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd-val.parquet
   train_files:
-    - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd.parquet
+    - /users/mtang/MultiMeditron/testtttt/medical-cases-train.parquet
   val_files:
-    - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd-val.parquet
+    - /users/mtang/MultiMeditron/testtttt/medical-cases-val.parquet
   prompt_key: prompt
   reward_fn_key: data_source
   return_multi_modal_inputs: false
@@ -44,13 +48,13 @@ actor_rollout_ref:
     # max_num_batched_tokens: 16384
     # max_num_seqs: 256
     n: 8
-    multi_turn:
-      enable: true
-      max_tool_response_length: 2048
-      max_assistant_turns: 3
-      tokenization_sanity_check_mode: strict
-      use_inference_chat_template: true
-      tool_config_path: /users/gboye/MultiMeditron/config/rl/grpo/tools.yaml
+    # multi_turn:
+    #   enable: true
+    #   max_tool_response_length: 2048
+    #   max_assistant_turns: 3
+    #   tokenization_sanity_check_mode: strict
+    #   use_inference_chat_template: true
+    #   tool_config_path: /users/mtang/MultiMeditron/config/rl/grpo/tools.yaml
   actor:
     ppo_mini_batch_size: 16
     # ppo_micro_batch_size: 16
@@ -60,3 +64,7 @@ actor_rollout_ref:
       param_offload: true
       optimizer_offload: true
       strategy: fsdp2
+trainer:
+  save_freq: 15
+  default_local_dir: /capstor/store/cscs/swissai/a127/meditron-reasoning-verl/checkpoints
+  logger: [console, wandb]

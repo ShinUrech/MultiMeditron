@@ -17,7 +17,7 @@ data:
 trainer:
   nnodes: 1
   n_gpus_per_node: 4
-  project_name: verl-test
+  project_name: verl
   experiment_name: v01
   logger: [console]
 
@@ -50,7 +50,7 @@ reward_model:
 
 actor_rollout_ref:
   model:
-    path: meta-llama/Llama-3.1-8B-Instruct
+    path: meta-llama/Llama-3.1-70B-Instruct
     use_shm: false
     use_remove_padding: false
     enable_gradient_checkpointing: false
