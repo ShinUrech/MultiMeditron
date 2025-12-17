@@ -73,7 +73,7 @@ if [[ ! -z "$INFER_CONFIG_PATH" ]]; then
     export SG_INFER_API_KEY="$INFER_API_KEY"
     echo "SG_INFER_ADDRESS: $SG_INFER_ADDRESS"
     echo "SG_INFER_API_KEY: $INFER_API_KEY"
-    RAY_NNODE=$((SLURM_NNODES-1))
+    RAY_NNODE=$((SLURM_NNODES-INFER_NUM_NODES))
 fi
 
 # Start ray HEAD node
@@ -112,14 +112,25 @@ if [[ $SLURM_NODEID -eq 0 ]]; then
         ray stop
         exit 1
     fi
-elif [[ $SLURM_NODEID -eq 1 && ! -z "$INFER_CONFIG_PATH" ]]; then
-    # Sleep infinity and do something else
-    echo "Starting INFERENCE node on http://$(hostname):$INFER_PORT"
-
+elif [[ $SLURM_NODEID -le $INFER_NUM_NODES && ! -z "$INFER_CONFIG_PATH" ]]; then
+    # Start inference nodes (the main node is also a worker)
+    if [[ $SLURM_NODEID -eq 1 ]]; then
+        # This is the main inference node
+        echo "Starting INFERENCE node on http://$(hostname):$INFER_PORT"
+    else
+        # This is a secondary inference node
+        echo "Starting INFERENCE WORKER node on $(hostname)"
+    fi
+    
     # Get the current bash file directory and run the parse_args.py script to get additional args
     CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-    echo "Current path: $CURRENT_PATH"
     additional_args=$(python $CURRENT_PATH/parse_args.py $INFER_CONFIG_PATH)
+
+    if [[ $INFER_NUM_NODES -gt 1 ]]; then
+        main_infer_node=$(scontrol show hostnames $SLURM_NODELIST | head -n 2 | tail -n 1)
+        additional_args="$additional_args --nnodes $INFER_NUM_NODES --node-rank $((SLURM_NODEID-1))"
+        additional_args="$additional_args --dist-init-addr $main_infer_node:50000"
+    fi
 
     # Start inference server
     cmd="python3 -m sglang.launch_server $additional_args --host $INFER_HOST --port $INFER_PORT --api-key $INFER_API_KEY"

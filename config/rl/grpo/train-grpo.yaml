@@ -17,14 +17,14 @@ data:
   train_batch_size: 16
   val_batch_size: 8
   return_raw_chat: true
-  # train_files:
-  #   - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd.parquet
-  # val_files:
-  #   - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd-val.parquet
   train_files:
-    - /users/mtang/MultiMeditron/testtttt/medical-cases-train.parquet
+    - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd.parquet
   val_files:
-    - /users/mtang/MultiMeditron/testtttt/medical-cases-val.parquet
+    - /capstor/store/cscs/swissai/a127/meditron/multimediset/reasoning/math-shepherd-val.parquet
+  # train_files:
+  #   - /users/mtang/MultiMeditron/testtttt/medical-cases-train.parquet
+  # val_files:
+  #   - /users/mtang/MultiMeditron/testtttt/medical-cases-val.parquet
   prompt_key: prompt
   reward_fn_key: data_source
   return_multi_modal_inputs: false

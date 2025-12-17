@@ -5,5 +5,5 @@
 --log-requests
 --tensor-parallel-size 4
 --pipeline-parallel-size 1
---data-parallel-size 1
---chunked-prefill-size 8192
+--chunked-prefill-size 4096
+--kv-cache-dtype fp8_e5m2

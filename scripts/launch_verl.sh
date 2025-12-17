@@ -22,18 +22,19 @@ Usage: $0 --config <config_name> [--num-nodes <num_nodes>]
          [--report-dir <report_dir>] [--timeout <timeout>]
          [--no-confirm] [--help]
 Options:
-  --config <config_name>    (Required) Path to the configuration file.
-  --environment             (Optional) Path to the environment, default to \`~/.edf/multimodal.toml\`.
-  --experiment-name <name>  (Optional) Name of the experiment. Default is derived from the date and time.
-  --num-nodes <num_nodes>   (Optional) Number of nodes to use. If not provided, the user will be prompted.
-  --report-dir <report_dir> (Optional) Directory to save reports. Default is './reports/verl'.
-  --venv-dir <venv_dir>     (Optional) Directory to store the virtual environment to. Default to './.venv'.
-  --timeout <timeout>       (Optional) Job timeout in HH:MM:SS format. Default is '11:59:00'.
-  --no-confirm              If set, skips the confirmation prompt before job submission.
-  --debug                   (Optional) Launch the job in the debug partition instead of normal.
-  --launch-infer <config>   (Optional) Launch a single node of inference in parallel to training.
-  --recreate-venv           If set, recreate the venv and rerun the install script.
-  --help                    (Optional) Display this help message and exit.
+  --config <config_name>      (Required) Path to the configuration file.
+  --environment               (Optional) Path to the environment, default to \`~/.edf/multimodal.toml\`.
+  --experiment-name <name>    (Optional) Name of the experiment. Default is derived from the date and time.
+  --num-nodes <num_nodes>     (Optional) Number of nodes to use. If not provided, the user will be prompted.
+  --report-dir <report_dir>   (Optional) Directory to save reports. Default is './reports/verl'.
+  --venv-dir <venv_dir>       (Optional) Directory to store the virtual environment to. Default to './.venv'.
+  --timeout <timeout>         (Optional) Job timeout in HH:MM:SS format. Default is '11:59:00'.
+  --no-confirm                If set, skips the confirmation prompt before job submission.
+  --debug                     (Optional) Launch the job in the debug partition instead of normal.
+  --launch-infer <config>     (Optional) Launch a single node of inference in parallel to training.
+  --infer-num-nodes <number>  (Optional) Specify the number of nodes to use for inference (default: 1). Must be less than total nodes.
+  --recreate-venv             If set, recreate the venv and rerun the install script.
+  --help                      (Optional) Display this help message and exit.
 EOF
 )
 
@@ -44,6 +45,7 @@ CURRENT_EDF_IMAGE=""
 INFER_PORT=63790
 INFER_HOST="0.0.0.0"
 INFER_CONFIG_PATH=""
+INFER_NUM_NODES=1
 if [[ "$HOSTNAME" == *-ln* ]]; then
     IS_LOGIN_NODE=true
     echo -e "${BLUE}Detected, running on login node, cannot create virtual environment here.${NC}"
@@ -109,6 +111,16 @@ while [[ "$#" -gt 0 ]]; do
             shift # past argument
             shift # past value
             ;;
+        --infer-num-nodes)
+            INFER_NUM_NODES="$2"
+            if ! [[ "$INFER_NUM_NODES" =~ ^[0-9]+$ ]]; then
+                echo "Error: --infer-num-nodes must be an integer."
+                echo "$USAGE_STRING"
+                exit 1
+            fi
+            shift # past argument
+            shift # past value
+            ;;
         --venv-dir)
             VENV_DIR="$2"
             shift # past argument
@@ -165,7 +177,13 @@ CONFIG_NAME="$(realpath "$CONFIG_NAME")"
 # Check that either the INFER_CONFIG_PATH is set or LAUNCH_INFER is 0
 LAUNCH_INFER=0
 if [ ! -z "$INFER_CONFIG_PATH" ]; then
-    LAUNCH_INFER=1
+    # Check that the infer num nodes is less than total nodes
+    if [ ! -z "$NUM_NODES" ] && [ "$INFER_NUM_NODES" -ge "$NUM_NODES" ]; then
+        echo -e "${RED}Error: --infer-num-nodes must be less than total --num-nodes (got $INFER_NUM_NODES >= $NUM_NODES).${NC}"
+        exit 1
+    fi
+
+    LAUNCH_INFER=$INFER_NUM_NODES
     INFER_CONFIG_PATH="$(realpath "$INFER_CONFIG_PATH")"
     INFER_API_KEY=$(openssl rand -hex 32)
     echo -e "${GREEN}Inference config path set to: $INFER_CONFIG_PATH, will launch inference node alongside training.${NC}"
@@ -218,7 +236,7 @@ if [ ! -d "$VENV_DIR" ] || [ ! -z "$RECREATE_VENV" ]; then
         $VENV_DIR
     source "$VENV_DIR/bin/activate"
 
-    pip install nvidia-ml-py 
+    pip install nvidia-ml-py rapidfuzz
     # sglang_router
     pip install deepspeed==0.17.0
     pip install -e .
@@ -261,6 +279,7 @@ echo "  Stdout file:        $REPORT_STDOUT_FILE"
 echo "  Stderr file:        $REPORT_STDERR_FILE"
 echo "  Timeout:            $TIMEOUT"
 echo "  Inference config:   $INFER_CONFIG_PATH"
+echo "  Inference num nodes: $INFER_NUM_NODES"
 echo "==================================="
 echo ""
 
@@ -287,7 +306,8 @@ VENV_DIR=$VENV_DIR,\
 INFER_CONFIG_PATH=$INFER_CONFIG_PATH,\
 INFER_PORT=$INFER_PORT,\
 INFER_HOST=$INFER_HOST,\
-INFER_API_KEY=$INFER_API_KEY\
+INFER_API_KEY=$INFER_API_KEY,\
+INFER_NUM_NODES=$INFER_NUM_NODES \
  \
 ${SCRIPT_DIR}/sbatch_ray_launcher.sh \
 mm verl \
