@@ -71,7 +71,6 @@ ENVIRONMENT="$HOME/.edf/multimodal.toml"
 TIMEOUT="11:59:00"
 EXPERIMENT_NAME="verl-$(date +%Y%m%d-%H%M%S)"
 PARTITION="normal"
-
 # Parse command line arguments
 while [[ "$#" -gt 0 ]]; do
     key="$1"
@@ -307,7 +306,9 @@ INFER_CONFIG_PATH=$INFER_CONFIG_PATH,\
 INFER_PORT=$INFER_PORT,\
 INFER_HOST=$INFER_HOST,\
 INFER_API_KEY=$INFER_API_KEY,\
-INFER_NUM_NODES=$INFER_NUM_NODES \
+INFER_NUM_NODES=$INFER_NUM_NODES,\
+WANDB_RESUME=$WANDB_RESUME,\
+WANDB_RUN_ID=$WANDB_RUN_ID \
  \
 ${SCRIPT_DIR}/sbatch_ray_launcher.sh \
 mm verl \
