@@ -72,11 +72,11 @@ class NsJailExecutor:
 
         # Bind-mount the python interpreter (if needed). If interpreter is available inside chroot, skip this.
         # Note: bind-mounting interpreter may not be sufficient if shared libs are needed (more bind mounts required).
-        if os.path.exists(self.python_interpreter):
-            cmd += ["--bindmount", f"{self.python_interpreter}:{self.python_interpreter}:ro"]
+        if os.path.exists(self.python_path):
+            cmd += ["--bindmount", f"{self.python_path}:{self.python_path}:ro"]
 
         # As final part, the program to execute inside the jail
-        cmd += ["--", self.python_interpreter, "/code.py"]
+        cmd += ["--", self.python_path, "/code.py"]
 
         return cmd
     

@@ -66,7 +66,7 @@ class BaseModalityProcessor(ABC, ProcessorMixin):
         """
         raise NotImplementedError
 
-    def __call__(self, modality: Dict[str, Any]) -> Dict[str, Any]:
+    def __call__(self, modality: Dict[str, Any]) -> Dict[str, Any]:  # pyright: ignore[reportIncompatibleMethodOverride]
         """
         Makes the processor callable, processing the given modality.
 
@@ -91,7 +91,7 @@ class BaseModality(ABC, PreTrainedModel):
         tokenizer (Optional[Any]): Tokenizer associated with the model, if any.
         _dtype (torch.dtype): Data type for the model's tensors.
     """
-    preprocessor_class: type = None
+    preprocessor_class: Optional[type] = None
 
     def __init__(self, config: BaseModalityConfig, dtype: torch.dtype = torch.bfloat16):
         """

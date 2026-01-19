@@ -1,5 +1,4 @@
 import ray
-import random
 from omegaconf import OmegaConf
 
 @ray.remote(num_cpus=1)
@@ -32,7 +31,7 @@ class TaskRunner:
         ray_worker_group_cls = RayWorkerGroup
 
         # Setup Ray
-        from verl.trainer.ppo.ray_trainer import ResourcePoolManager, Role
+        from verl.trainer.ppo.utils import ResourcePoolManager, Role
 
         role_worker_mapping = {
             Role.ActorRollout: ray.remote(ActorRolloutRefWorker),
