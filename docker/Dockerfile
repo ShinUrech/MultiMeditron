@@ -17,5 +17,7 @@ WORKDIR /workspace/MultiMeditron
 RUN pip install -e ".[flash-attn]"
 RUN pip install git+https://github.com/EPFLiGHT/lmms-eval.git 
 
-COPY entrypoint.sh /workspace/entrypoint.sh
+COPY docker/entrypoint.sh /workspace/entrypoint.sh
 RUN chmod +x /workspace/entrypoint.sh
+
+ENTRYPOINT ["/workspace/entrypoint.sh"]
