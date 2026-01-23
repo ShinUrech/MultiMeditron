@@ -9,9 +9,13 @@ RUN apt-get update && \
         ffmpeg \
         tmux \
         sudo \
-        git 
+        git \
+        gosu 
 
 COPY . /workspace/MultiMeditron
 WORKDIR /workspace/MultiMeditron
 RUN pip install -e ".[flash-attn]"
-RUN pip install git+https://github.com/EPFLiGHT/lmms-eval.git
+RUN pip install git+https://github.com/EPFLiGHT/lmms-eval.git 
+
+COPY entrypoint.sh /workspace/entrypoint.sh
+RUN chmod +x /workspace/entrypoint.sh
