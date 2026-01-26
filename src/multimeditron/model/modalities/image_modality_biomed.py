@@ -64,7 +64,7 @@ class BioMedCLIPImageProcessor(BaseModalityProcessor):
         processed = modality.copy()
         image: Image.Image = modality[MODALITY_VALUE_KEY]
 
-        pixel_values = self.preprocess(image)
+        pixel_values = self.preprocess(image)["pixel_values"]
         processed[MODALITY_VALUE_KEY] = pixel_values
         processed[NUM_EMBEDDINGS_KEY] = self._num_patches_per_entry
 
@@ -84,17 +84,17 @@ class BioMedCLIPImageModality(BaseModality):
         super().__init__(config)
 
         assert config.clip_name is not None
-
-        self.feature_extractor = AutoModel.from_pretrained(
+        
+        self.feature_config = AutoConfig.from_pretrained(
                 config.clip_name,
                 trust_remote_code=config.trust_remote_code
         )
-
-        remote_config = AutoConfig.from_pretrained(
-                config.clip_name,
+        self.feature_extractor = AutoModel.from_config(
+                self.feature_config,
                 trust_remote_code=config.trust_remote_code
         )
-        self.embedding_size = remote_config.vision_cfg["width"]
+
+        self.embedding_size = self.feature_config.vision_cfg["width"]
 
         self.projector = MLPProjector(
             self.embedding_size,
@@ -102,6 +102,11 @@ class BioMedCLIPImageModality(BaseModality):
             dtype=self.dtype,
         )
 
+    def bootstrap_feature_extractor(self):
+        self.feature_extractor = AutoModel.from_pretrained(
+                self.config.clip_name,
+                trust_remote_code=self.config.trust_remote_code
+        )
 
     def forward(self, inputs) -> torch.FloatTensor:
         """

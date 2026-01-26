@@ -120,12 +120,17 @@ class ImageModality(BaseModality):
 
         self.vision_tower_name = config.clip_name
         assert self.vision_tower_name is not None, "vision_tower_name must be specified in the config"
-
-        self.feature_extractor = AutoModel.from_pretrained(self.vision_tower_name, trust_remote_code=True)
+        
+        feature_config = AutoConfig.from_pretrained(self.vision_tower_name)
+        self.feature_extractor = AutoModel.from_config(feature_config)
+        # self.feature_extractor = AutoModel.from_pretrained(self.vision_tower_name, trust_remote_code=True)
         self.embedding_size = self.feature_extractor.vision_embed_dim
         self._num_patches_per_entry = (self.feature_extractor.vision_model.config.image_size // self.feature_extractor.vision_model.config.patch_size) ** 2
 
         self.projector = MLPProjector(self.embedding_size, config.hidden_size, dtype=self.dtype)
+
+    def bootstrap_feature_extractor(self):
+        self.feature_extractor = AutoModel.from_pretrained(self.vision_tower_name, trust_remote_code=True)
 
     def forward(self, inputs) -> torch.FloatTensor:
         inputs = torch.stack(inputs, dim=0)

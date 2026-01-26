@@ -1,7 +1,7 @@
 import torch
 from multimeditron.model.constants import NUM_EMBEDDINGS_KEY, MODALITY_VALUE_KEY
 from multimeditron.model.modalities import AutoModality, BaseModality, BaseModalityConfig, BaseModalityProcessor
-from multimeditron.model.modalities.moe.gating import GatingNetwork
+from multimeditron.model.modalities.moe.gating import GatingNetwork, GatingNetworkConfig
 from multimeditron.model.projectors.mlp import MLPProjector
 from multimeditron.model.attention import CrossAttention
 from transformers import AutoModel, AutoImageProcessor, AutoConfig, AutoImageProcessor, AutoConfig
@@ -110,7 +110,9 @@ class MOEImageModality(BaseModality):
         
         self.embedding_size = None
         for clip_name in config.expert_clip_names:
-            expert_model = AutoModel.from_pretrained(clip_name, trust_remote_code=True)
+            expert_config = AutoConfig.from_pretrained(clip_name, trust_remote_code=True)
+            expert_model = AutoModel.from_config(expert_config)
+            # expert_model = AutoModel.from_pretrained(clip_name, trust_remote_code=True)
 
             if self.embedding_size is None:
                 self.embedding_size = expert_model.vision_embed_dim
@@ -120,7 +122,8 @@ class MOEImageModality(BaseModality):
         self._num_patches_per_entry = (self.experts[0].config.image_size // self.experts[0].config.patch_size) ** 2
         self.generalist_idx = config.generalist_idx
         self.fusion_method = config.fusion_method
-        self.gating_network = GatingNetwork.from_pretrained(config.gating_path)
+        gating_config = GatingNetworkConfig.from_pretrained(config.gating_path)
+        self.gating_network = GatingNetwork.from_config(gating_config)
 
         gate_class_names: List[str] = getattr(self.gating_network.config, "class_names", []) or []
         if gate_class_names:
@@ -148,6 +151,13 @@ class MOEImageModality(BaseModality):
             )
 
         self.modality_frozen = not self.training
+
+    def bootstrap_feature_extractor(self):
+        for i in range(len(self.experts)):
+            clip_name = self.config.expert_clip_names
+            self.experts[i] = AutoModel.from_pretrained(clip_name)
+
+        self.gating_network = GatingNetwork.from_pretrained(self.config.gating_path)
 
     def forward(self, inputs) -> torch.Tensor:
         device = next(self.experts[0].parameters()).device

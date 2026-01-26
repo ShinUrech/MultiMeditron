@@ -1,6 +1,6 @@
 from multimeditron.model.constants import NUM_EMBEDDINGS_KEY, MODALITY_VALUE_KEY
 from multimeditron.model.modalities import AutoModality, BaseModality, BaseModalityConfig, BaseModalityProcessor
-from multimeditron.model.modalities.moe.gating import GatingNetwork
+from multimeditron.model.modalities.moe.gating import GatingNetwork, GatingNetworkConfig
 from multimeditron.model.projectors.mlp import MLPProjector
 from multimeditron.model.attention import CrossAttention
 import torch
@@ -112,7 +112,10 @@ class MOEImageModalityPEP(BaseModality):
         self._embedding_size = config.hidden_size  # post-projection dim seen by the LLM
 
         for clip_name in config.expert_clip_names:
-            expert_model = AutoModel.from_pretrained(clip_name, trust_remote_code=True)
+            # expert_model = AutoModel.from_pretrained(clip_name, trust_remote_code=True)
+            expert_config = AutoConfig.from_pretrained(clip_name, trust_remote_code=True)
+            breakpoint()
+            expert_model = AutoModel.from_config(expert_config)
 
             # robustly get the vision embedding dim across CLIP impls
             if hasattr(expert_model, "vision_embed_dim"):
@@ -158,7 +161,9 @@ class MOEImageModalityPEP(BaseModality):
 
         self.generalist_idx = config.generalist_idx
         self.fusion_method = config.fusion_method
-        self.gating_network = GatingNetwork.from_pretrained(config.gating_path)
+
+        gating_config = GatingNetworkConfig.from_pretrained(config.gating_path)
+        self.gating_network = GatingNetwork.from_config(gating_config)
 
         # build perm[class_idx] = expert_idx so we can align gating → experts
         gate_class_names: List[str] = getattr(self.gating_network.config, "class_names", []) or []
@@ -186,6 +191,13 @@ class MOEImageModalityPEP(BaseModality):
             )
 
         self.modality_frozen = not self.training
+
+    def bootstrap_feature_extractor(self):
+        for i in range(len(self.experts)):
+            clip_name = self.config.expert_clip_names
+            self.experts[i] = AutoModel.from_pretrained(clip_name)
+
+        self.gating_network = GatingNetwork.from_pretrained(self.config.gating_path)
 
 
     def forward(self, inputs) -> torch.Tensor:

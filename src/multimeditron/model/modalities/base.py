@@ -118,6 +118,10 @@ class BaseModality(ABC, PreTrainedModel):
         return self.config
     
     @abstractmethod
+    def bootstrap_feature_extractor(self):
+        ...
+    
+    @abstractmethod
     def freeze_modality_embedder(self):
         """
         Freeze the parameters of the modality

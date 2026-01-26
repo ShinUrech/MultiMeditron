@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,6 +7,7 @@ from transformers import PreTrainedModel, PretrainedConfig, AutoModel, AutoConfi
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from dataclasses import dataclass, field
 
+from multimeditron.model import modalities
 from multimeditron.model.modalities import BaseModalityProcessor, AutoModality, BaseModalityConfig, BaseModality
 from multimeditron.utils import get_torch_dtype
 import logging
@@ -226,7 +226,6 @@ class MultiModalModelForCausalLM(PreTrainedModel):
     def __init__(
         self,
         config: MultimodalConfig,
-        bootstrap=False,
     ):
         """
         Initialize a MultiModalModelForCausalLM instance.
@@ -239,8 +238,6 @@ class MultiModalModelForCausalLM(PreTrainedModel):
         Args:
             config (MultimodalConfig): The configuration object containing model parameters,
                 including modality configurations, vocabulary size, and other settings.
-            bootstrap (bool, optional): If True, loads the pretrained model from the path
-                specified in config. If False, creates a model from config only. Defaults to False.
 
         Raises:
             ValueError: If multiple modality configurations of the same type are provided.
@@ -249,16 +246,11 @@ class MultiModalModelForCausalLM(PreTrainedModel):
 
         dtype = get_torch_dtype(config.dtype)
 
-        if bootstrap:
-            self.model = AutoModelForCausalLM.from_pretrained(config.llm_path, attn_implementation="flash_attention_2")
-        else:
-            llm_config = AutoConfig.from_pretrained(
-                    config.llm_path,
-                    torch_dtype=dtype
-                )
-            self.model = AutoModelForCausalLM.from_config(
-                config=llm_config, attn_implementation="eager")
-
+        llm_config = AutoConfig.from_pretrained(
+                config.llm_path,
+                torch_dtype=dtype
+        )
+        self.model = AutoModelForCausalLM.from_config(config=llm_config)
         self.model.resize_token_embeddings(config.vocab_size, mean_resizing=False)
 
         # Add the language model to the transformer
@@ -283,6 +275,12 @@ class MultiModalModelForCausalLM(PreTrainedModel):
 
         # Post init
         self.post_init()
+
+    def bootstrap(self):
+        self.model = AutoModelForCausalLM.from_pretrained(self.config.llm_path)
+        self.model.resize_token_embeddings(self.config.vocab_size, mean_resizing=False)
+        for modality in self.modalities_with_projection:
+            modality.bootstrap_feature_extractor()
 
     def _init_weights(self, module):
         """
@@ -319,6 +317,7 @@ class MultiModalModelForCausalLM(PreTrainedModel):
         This configuration is useful when aligning modality representations with
         the language model's embedding space while keeping the core LM frozen.
         """
+        # for modality_with_proj in self.modalities_with_projection:
         for modality_with_proj in self.modalities_with_projection:
             modality_with_proj.unfreeze_projection()
             modality_with_proj.freeze_modality_embedder()
@@ -700,7 +699,7 @@ def bootstrap(config, tokenizer, modalities_config):
     Returns:
         MultiModalModelForCausalLM: The initialized multimodal model.
     """
-    
+
 
     multimodal_config = MultimodalConfig(
         hidden_size=config["token_size"],
@@ -712,8 +711,9 @@ def bootstrap(config, tokenizer, modalities_config):
         max_sequence_length=config.get("max_sequence_length", None),
     )
 
-    model = MultiModalModelForCausalLM(
-        multimodal_config, bootstrap=True)
+    model = MultiModalModelForCausalLM(multimodal_config)
+    model.bootstrap()
+
     return model
 
 
