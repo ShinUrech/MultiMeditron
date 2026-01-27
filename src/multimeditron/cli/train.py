@@ -116,17 +116,36 @@ def train(config: str,
         loader_type = loader_copy.pop("loader_type")
         modality_type = loader_copy.pop("modality_type")
         modalities_loader[modality_type] = AutoModalityLoader.from_name(loader_type, **loader_copy)
+   
 
-    with deepspeed.zero.Init(dtype=torch.bfloat16):
-        if config_dict.get("base_model", None) is None:
-            model = bootstrap(config_dict, tokenizer, modalities_config)
-        else:
-            # load starting weights from base_model (hub id or local checkpoint dir).
-            model = MultiModalModelForCausalLM.from_pretrained(
-                config_dict["base_model"], 
-                truncation=config_dict.get("truncation", False),
-                max_sequence_length=config_dict.get("max_sequence_length", None)
-            )
+    
+
+    if config_dict.get("base_model", None) is None:
+        # multimodal_config = MultimodalConfig(
+        #     hidden_size=config_dict["token_size"],
+        #     vocab_size=len(tokenizer),
+        #     eos_token_idx=tokenizer.convert_tokens_to_ids(tokenizer.eos_token),
+        #     modalities=modalities_config,
+        #     llm_path=config_dict["base_llm"],
+        #     truncation=config_dict.get("truncation", False),
+        #     max_sequence_length=config_dict.get("max_sequence_length", None),
+        # )
+        # model = MultiModalModelForCausalLM(multimodal_config)
+        # model.bootstrap()
+        from transformers.integrations.deepspeed import (
+            set_hf_deepspeed_config,
+            unset_hf_deepspeed_config,
+        )
+        unset_hf_deepspeed_config()
+        model = bootstrap(config_dict, tokenizer, modalities_config)
+        set_hf_deepspeed_config(training_args.hf_deepspeed_config)
+    else:
+        # load starting weights from base_model (hub id or local checkpoint dir).
+        model = MultiModalModelForCausalLM.from_pretrained(
+            config_dict["base_model"], 
+            truncation=config_dict.get("truncation", False),
+            max_sequence_length=config_dict.get("max_sequence_length", None)
+        )
 
     model.train()
     processors = model.processors()

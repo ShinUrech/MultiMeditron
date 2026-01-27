@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Generator, Optional, List, Union, Tuple, Any, Dict, Callable
 from transformers import PreTrainedModel, PretrainedConfig, AutoModel, AutoConfig, AutoProcessor, AutoModelForCausalLM
+from transformers.integrations.deepspeed import unset_hf_deepspeed_config
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from dataclasses import dataclass, field
 
@@ -699,8 +700,7 @@ def bootstrap(config, tokenizer, modalities_config):
     Returns:
         MultiModalModelForCausalLM: The initialized multimodal model.
     """
-
-
+    
     multimodal_config = MultimodalConfig(
         hidden_size=config["token_size"],
         vocab_size=len(tokenizer),

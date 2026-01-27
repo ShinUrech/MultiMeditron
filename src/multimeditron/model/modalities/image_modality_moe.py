@@ -154,7 +154,7 @@ class MOEImageModality(BaseModality):
 
     def bootstrap_feature_extractor(self):
         for i in range(len(self.experts)):
-            clip_name = self.config.expert_clip_names
+            clip_name = self.config.expert_clip_names[i]
             self.experts[i] = AutoModel.from_pretrained(clip_name)
 
         self.gating_network = GatingNetwork.from_pretrained(self.config.gating_path)

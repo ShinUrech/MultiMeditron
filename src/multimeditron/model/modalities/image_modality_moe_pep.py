@@ -114,7 +114,6 @@ class MOEImageModalityPEP(BaseModality):
         for clip_name in config.expert_clip_names:
             # expert_model = AutoModel.from_pretrained(clip_name, trust_remote_code=True)
             expert_config = AutoConfig.from_pretrained(clip_name, trust_remote_code=True)
-            breakpoint()
             expert_model = AutoModel.from_config(expert_config)
 
             # robustly get the vision embedding dim across CLIP impls
@@ -163,7 +162,7 @@ class MOEImageModalityPEP(BaseModality):
         self.fusion_method = config.fusion_method
 
         gating_config = GatingNetworkConfig.from_pretrained(config.gating_path)
-        self.gating_network = GatingNetwork.from_config(gating_config)
+        self.gating_network = GatingNetwork(gating_config)
 
         # build perm[class_idx] = expert_idx so we can align gating → experts
         gate_class_names: List[str] = getattr(self.gating_network.config, "class_names", []) or []
@@ -194,7 +193,7 @@ class MOEImageModalityPEP(BaseModality):
 
     def bootstrap_feature_extractor(self):
         for i in range(len(self.experts)):
-            clip_name = self.config.expert_clip_names
+            clip_name = self.config.expert_clip_names[i]
             self.experts[i] = AutoModel.from_pretrained(clip_name)
 
         self.gating_network = GatingNetwork.from_pretrained(self.config.gating_path)

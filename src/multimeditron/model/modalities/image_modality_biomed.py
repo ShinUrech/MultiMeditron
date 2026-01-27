@@ -1,3 +1,4 @@
+import deepspeed
 from transformers import AutoConfig, AutoImageProcessor, AutoModel
 from multimeditron.model.modalities.base import BaseModalityConfig
 
@@ -12,7 +13,6 @@ from multimeditron.model.constants import (
 )
 from multimeditron.model.modalities.base import BaseModalityProcessor, BaseModality, AutoModality
 from multimeditron.model.projectors.mlp import MLPProjector
-
 
 class BioMedCLIPImageConfig(BaseModalityConfig):
     """
@@ -64,7 +64,7 @@ class BioMedCLIPImageProcessor(BaseModalityProcessor):
         processed = modality.copy()
         image: Image.Image = modality[MODALITY_VALUE_KEY]
 
-        pixel_values = self.preprocess(image)["pixel_values"]
+        pixel_values = self.preprocess(image)["pixel_values"][0]
         processed[MODALITY_VALUE_KEY] = pixel_values
         processed[NUM_EMBEDDINGS_KEY] = self._num_patches_per_entry
 
@@ -89,6 +89,7 @@ class BioMedCLIPImageModality(BaseModality):
                 config.clip_name,
                 trust_remote_code=config.trust_remote_code
         )
+        
         self.feature_extractor = AutoModel.from_config(
                 self.feature_config,
                 trust_remote_code=config.trust_remote_code
@@ -102,11 +103,14 @@ class BioMedCLIPImageModality(BaseModality):
             dtype=self.dtype,
         )
 
+        self.post_init()
+
     def bootstrap_feature_extractor(self):
-        self.feature_extractor = AutoModel.from_pretrained(
-                self.config.clip_name,
-                trust_remote_code=self.config.trust_remote_code
-        )
+        with deepspeed.zero.Init(enabled=False):
+            self.feature_extractor = AutoModel.from_pretrained(
+                    self.config.clip_name,
+                    trust_remote_code=self.config.trust_remote_code
+            )
 
     def forward(self, inputs) -> torch.FloatTensor:
         """
