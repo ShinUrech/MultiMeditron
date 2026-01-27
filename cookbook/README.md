@@ -275,3 +275,11 @@ tokenizer_type: qwen3  # (or apertus, llama depending on your setup)
 
 The available tokenizer types are: `qwen3`, `apertus`, and `llama`.
 
+## 🥳 Next steps
+
+Congratulations! You've successfully trained and tested your MultiMeditron model. Now, it's time to try out various setups, datasets, and tasks to explore its potential further. There's a more advanced guide on our website at [https://epflight.github.io/MultiMeditron/](https://epflight.github.io/MultiMeditron/) that you can use as a reference. It covers:
+
+- How to add and integrate new modalities with this guide [https://epflight.github.io/MultiMeditron/guides/add_modality.html](https://epflight.github.io/MultiMeditron/guides/add_modality.html)
+- Details on the dataset format and instructions for creating your own datasets using this guide [https://epflight.github.io/MultiMeditron/guides/dataset_format.html](https://epflight.github.io/MultiMeditron/guides/dataset_format.html)
+- Known issues and troubleshooting tips [https://epflight.github.io/MultiMeditron/guides/known_issues.html.](https://epflight.github.io/MultiMeditron/guides/known_issues.html.) Please note, this guide may not be fully completed yet, as there were numerous issues during development 🥲.
+

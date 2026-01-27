@@ -13,6 +13,7 @@ Configuration Reference
     token_size: # (int) Dimension of the embedding of a token for the LLM
     truncation: # (Optional[boolean]) Whether to truncate the input or not, default to false
     max_sequence_length: # (Optional[int]) The maximum sequence length if truncation is enabled
+    use_2d_position_ids: # (Optional[boolean]) Whether to use 2D positional embeddings for the LLM. Default to false
 
     modalities:
         config: # (Dict[str, str]) Configuration passed to the modality

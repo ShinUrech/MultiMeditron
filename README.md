@@ -130,7 +130,7 @@ print(tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokeniz
 
 ## 🧩 Adding a New Modality
 
-MultiMeditron’s architecture is fully **extensible**.
+MultiMeditron's architecture is fully **extensible**.
 To add a new modality, see the [developer documentation](https://epflight.github.io/MultiMeditron/guides/add_modality.html) for a step-by-step guide.
 
 
