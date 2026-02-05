@@ -4,7 +4,7 @@ import json, time, re
 from typing import List
 import config
 
-client = OpenAI(api_key=config.OPEN_API_KEY)
+client = OpenAI(api_key=config.OPENAI_API_KEY)
 OUT_DIR = Path(config.OUTPUT_DIR)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

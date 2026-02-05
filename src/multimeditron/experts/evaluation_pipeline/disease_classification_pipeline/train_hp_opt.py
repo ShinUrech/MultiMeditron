@@ -28,8 +28,6 @@ from torchvision.transforms.functional import InterpolationMode
 from multiprocessing import Pool
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
-import os
-
 import transformers
 from transformers import (
     AutoImageProcessor,
@@ -571,9 +569,9 @@ def objective(trial, bench_list, config_path):
     benchmark_results = []
     for benchmark in bench_list:
         #il me manque le model
-        print("on est en train d0eval ")
+        print("Starting benchmark evaluation...")
         benchmark_results.append(benchmark.evaluate(training_args.output_dir))
-        print("fin d'eval")
+        print("Finished benchmark evaluation.")
 
     #calcul de la moyenne geometrique
     temp = 1.0
@@ -609,15 +607,7 @@ def train(bench_list: List[Benchmark], config_path):
     study.optimize(objective_wrapper, n_trials=3)
      
     return study
-    """
-    combined_study = merge_studies()#
-    print("Best Hyperparameters: ", study.best_params)
-    
-    fig = optuna.visualization.plot_parallel_coordinate(study)
-    fig.write_html("parallel_coordinate.html")
-    fig = optuna.visualization.plot_param_importances(study)
-    fig.write_html("plot_param_importance.html")
-    """
+
 def plot_study(study):
     print("Best Hyperparameters: ", study.best_params)
 

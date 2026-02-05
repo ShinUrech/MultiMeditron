@@ -25,12 +25,12 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # Safety checks
 # ---------------------------------------------------------------------
 
-if not config.OPEN_API_KEY:
+if not config.OPENAI_API_KEY:
     raise SystemExit(
         "OPENAI_API_KEY is not set. Please export it before running."
     )
 
-client = OpenAI(api_key=config.OPEN_API_KEY)
+client = OpenAI(api_key=config.OPENAI_API_KEY)
 
 # ---------------------------------------------------------------------
 # Load batch parts

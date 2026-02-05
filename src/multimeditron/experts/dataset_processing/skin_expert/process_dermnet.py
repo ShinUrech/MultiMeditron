@@ -118,8 +118,8 @@ def build_train_hashes(dirs: List[Path]) -> Set[str]:
             if is_image(img):
                 try:
                     hashes.add(md5sum(img))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to compute MD5 hash for training image {img}: {e}")
     if hashes:
         logger.info(f"Loaded {len(hashes)} training image hashes for de-duplication")
     return hashes

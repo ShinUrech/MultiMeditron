@@ -1,12 +1,3 @@
-
-from transformers import VisionTextDualEncoderProcessor, AutoTokenizer
-from load_from_clip import load_model
-from PIL import Image
-from pathlib import Path
-import torch
-import json
-import random
-
 """
 CLIP Image–Text Alignment Evaluation (Recall@1, 4-Way Forced Choice)
 
@@ -42,31 +33,121 @@ Notes
 - Negatives are randomly sampled per query (seeded for reproducibility).
 - Image paths are resolved relative to the JSONL manifest location.
 - This evaluation is intended for comparative analysis between models and
-  fine-tuned checkpoints, not for benchmarking against large-scale retrieval
-  datasets such as COCO or Flickr30k.
+  fine-tuned checkpoints.
 
-Typical Usage
--------------
-- Compare base CLIP vs. domain-adapted (e.g., ophthalmology- or dermatology-
-  fine-tuned) models.
-- Sanity-check representation quality before large-scale training or deployment.
-- Evaluate alignment improvements under controlled retrieval difficulty.
+CLI Usage
+---------
+Basic (uses defaults from the original script):
+    python base_sim_benchmark.py
+
+Evaluate a specific model + dataset and write logs to a custom directory:
+    python base_sim_benchmark.py \
+        --model finetuned /path/to/model_checkpoint_or_repo \
+        --eval-datasets /path/to/eyepacs_val.jsonl \
+        --log-dir ./logs
+
+Evaluate multiple models:
+    python base_sim_benchmark.py \
+        --model base /path/to/base_model \
+        --model finetuned /path/to/finetuned_model \
+        --eval-datasets /path/to/eyepacs_val.jsonl \
+        --log-dir ./logs
+
+Control evaluation size, seed, and device:
+    python base_sim_benchmark.py \
+        --line-number 2000 \
+        --seed 14 \
+        --device cuda:0
+
+Arguments
+---------
+--model NAME PATH
+    Add a model to evaluate. Can be repeated. Example:
+        --model base /path/to/base --model finetuned /path/to/finetuned
+
+--eval-datasets PATH [PATH ...]
+    One or more JSONL dataset manifests to evaluate.
+
+--log-dir PATH
+    Directory to write per-model logs.
+
+--line-number N
+    Maximum number of JSONL lines to evaluate (default: 1000).
+
+--seed N
+    Random seed for negative sampling and torch seed (default: 14).
+
+--device DEVICE
+    Force device: "cuda", "cuda:0", or "cpu". If omitted, auto-detect.
 """
 
-LINE_NUMBER = 1000
-EVAL_DATASETS = [
-    "/mloscratch/users/turan/datasets/opthalmology_expert_datasets/eyepacs/eyepacs_val.jsonl",
-]
-LOG_DIR = Path("/mloscratch/users/turan/evaluation_clip/logs")
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+from __future__ import annotations
 
-random.seed(14)
-torch.manual_seed(14)
-device = "cuda" if torch.cuda.is_available() else "cpu"
+import argparse
+import json
+import random
+from pathlib import Path
+from typing import List, Tuple, Optional
 
-# return the similarity between an image and a text according to the given model
+import torch
+from PIL import Image
+from transformers import VisionTextDualEncoderProcessor, AutoTokenizer
+
+from load_from_clip import load_model
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Evaluate CLIP-style image-text alignment via 4-way forced-choice Recall@1."
+    )
+
+    p.add_argument(
+        "--eval-datasets",
+        nargs="+",
+        default=[
+            "/mloscratch/users/turan/datasets/opthalmology_expert_datasets/eyepacs/eyepacs_val.jsonl",
+        ],
+        help="One or more JSONL eval dataset paths.",
+    )
+    p.add_argument(
+        "--log-dir",
+        default="/mloscratch/users/turan/evaluation_clip/logs",
+        help="Directory to write log files.",
+    )
+
+    # Repeatable: --model NAME PATH
+    p.add_argument(
+        "--model",
+        action="append",
+        nargs=2,
+        metavar=("NAME", "PATH"),
+        default=[
+            ["finetuned_clip_2", "/mloscratch/users/turan/training/models_opthalmology/combined_dataset_opthalmology_fine_tuning_config_2"]
+        ],
+        help="Add a model as: --model <name> <model_path>. Can be repeated.",
+    )
+
+    p.add_argument(
+        "--line-number",
+        type=int,
+        default=1000,
+        help="Max number of JSONL lines to evaluate from each dataset.",
+    )
+    p.add_argument("--seed", type=int, default=14, help="Random seed.")
+    p.add_argument(
+        "--device",
+        default=None,
+        help='Device override, e.g. "cuda", "cuda:0", or "cpu". Default: auto.',
+    )
+
+    return p.parse_args()
+
+
 @torch.no_grad()
-def get_similarity(text, image_path, model, processor) -> float:
+def get_similarity(text: str, image_path: str, model, processor, device: str) -> float:
+    """
+    Return cosine similarity between an image and a text according to the given model.
+    """
     image = Image.open(image_path)
     if image.mode != "RGB":
         image = image.convert("RGB")
@@ -75,9 +156,8 @@ def get_similarity(text, image_path, model, processor) -> float:
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
     outputs = model(**inputs)
-
-    image_embeds = outputs.image_embeds   # (1, D)
-    text_embeds = outputs.text_embeds     # (1, D)
+    image_embeds = outputs.image_embeds  # (1, D)
+    text_embeds = outputs.text_embeds    # (1, D)
 
     a_norm = torch.nn.functional.normalize(image_embeds, dim=1)
     b_norm = torch.nn.functional.normalize(text_embeds, dim=1)
@@ -87,13 +167,27 @@ def get_similarity(text, image_path, model, processor) -> float:
 
 
 @torch.no_grad()
-def evaluate_model(model_name_or_path: str, eval_dataset: str, log_fp=None) -> float:
+def evaluate_model(
+    model_name_or_path: str,
+    eval_dataset: str,
+    *,
+    line_number: int,
+    device: str,
+    seed: int,
+    log_fp=None,
+) -> float:
+    """
+    Evaluate a given model on a JSONL dataset using 4-way forced choice Recall@1.
+    """
     # small helper to log to both stdout and file
     def log_print(msg: str):
         print(msg)
         if log_fp is not None:
             log_fp.write(msg + "\n")
             log_fp.flush()
+
+    # ensure deterministic negative sampling per call (given seed)
+    rng = random.Random(seed)
 
     clip_model = load_model(model_name_or_path).to(device).eval()
     processor = VisionTextDualEncoderProcessor.from_pretrained(model_name_or_path)
@@ -116,9 +210,8 @@ def evaluate_model(model_name_or_path: str, eval_dataset: str, log_fp=None) -> f
         padding=True,
     ).to(device)
 
-    with torch.no_grad():
-        probe_out = clip_model(**probe_inputs)
-        text_embs = probe_out.text_embeds  # (6, D)
+    probe_out = clip_model(**probe_inputs)
+    text_embs = probe_out.text_embeds  # (6, D)
 
     pairwise = torch.nn.functional.cosine_similarity(
         text_embs.unsqueeze(1), text_embs.unsqueeze(0), dim=-1
@@ -149,9 +242,8 @@ def evaluate_model(model_name_or_path: str, eval_dataset: str, log_fp=None) -> f
         padding=True,
     ).to(device)
 
-    with torch.no_grad():
-        image_probe_out = clip_model(**image_probe_inputs)
-        image_embs = image_probe_out.image_embeds  # (6, D)
+    image_probe_out = clip_model(**image_probe_inputs)
+    image_embs = image_probe_out.image_embeds  # (6, D)
 
     image_pairwise = torch.nn.functional.cosine_similarity(
         image_embs.unsqueeze(1), image_embs.unsqueeze(0), dim=-1
@@ -172,7 +264,7 @@ def evaluate_model(model_name_or_path: str, eval_dataset: str, log_fp=None) -> f
     if not all_lines:
         raise ValueError(f"No lines found in {eval_dataset}")
 
-    N = min(LINE_NUMBER, len(all_lines))
+    N = min(line_number, len(all_lines))
     lines = all_lines[:N]
     base_dir = Path(eval_dataset).parent
 
@@ -183,7 +275,12 @@ def evaluate_model(model_name_or_path: str, eval_dataset: str, log_fp=None) -> f
         # sample 3 distinct negatives != i
         candidates = list(range(N))
         candidates.remove(i)
-        a, b, c = random.sample(candidates, 3)
+
+        # if N is too small, skip
+        if len(candidates) < 3:
+            break
+
+        a, b, c = rng.sample(candidates, 3)
 
         correct_line = json.loads(line)
         a_line = json.loads(lines[a])
@@ -214,7 +311,7 @@ def evaluate_model(model_name_or_path: str, eval_dataset: str, log_fp=None) -> f
             tokens = tokenizer.encode(t, truncation=True, max_length=500)
             text_value = tokenizer.decode(tokens, skip_special_tokens=True)
 
-            sim = get_similarity(text_value, image_path, clip_model, processor)
+            sim = get_similarity(text_value, image_path, clip_model, processor, device)
             model_similarities.append(sim)
 
         pred_idx = int(torch.tensor(model_similarities).argmax().item())
@@ -232,33 +329,57 @@ def evaluate_model(model_name_or_path: str, eval_dataset: str, log_fp=None) -> f
     log_print(f"Used {used} samples, accuracy = {acc:.4f}")
     return acc
 
-def main():
-    clips = [
-    ("finetuned_clip_2", "/mloscratch/users/turan/training/models_opthalmology/combined_dataset_opthalmology_fine_tuning_config_2"),
-    ]
+
+def main() -> None:
+    args = parse_args()
+
+    # seeds / device
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
+
+    device = args.device if args.device is not None else ("cuda" if torch.cuda.is_available() else "cpu")
+
+    log_dir = Path(args.log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    clips: List[Tuple[str, str]] = [(name, path) for (name, path) in args.model]
+    eval_datasets: List[str] = args.eval_datasets
 
     for name, model_id in clips:
-        model_slug = Path(model_id).name  # last path component
-        log_path = LOG_DIR / f"{model_slug}.txt"
+        model_slug = Path(model_id).name
+        log_path = log_dir / f"{model_slug}.txt"
 
         print(f"\n========== Logging for config: {name} ({model_id}) ==========")
         print(f"Log file: {log_path}")
+        print(f"Device: {device}")
+        print(f"Line number: {args.line_number}")
+        print(f"Seed: {args.seed}")
 
         with open(log_path, "w", encoding="utf-8") as log_fp:
-            for eval_dataset in EVAL_DATASETS:
+            for eval_dataset in eval_datasets:
                 dataset_slug = Path(eval_dataset).stem
-                header = f"\n\n===== Evaluating model {name} ({model_id}) on dataset {dataset_slug} ====="
+                header = (
+                    f"\n\n===== Evaluating model {name} ({model_id}) "
+                    f"on dataset {dataset_slug} ({eval_dataset}) ====="
+                )
                 print(header)
                 log_fp.write(header + "\n")
                 log_fp.flush()
 
-                acc = evaluate_model(model_id, eval_dataset, log_fp=log_fp)
+                acc = evaluate_model(
+                    model_id,
+                    eval_dataset,
+                    line_number=args.line_number,
+                    device=device,
+                    seed=args.seed,
+                    log_fp=log_fp,
+                )
 
                 summary = f"{name} accuracy on {dataset_slug}: {acc:.4f}"
                 print(summary)
                 log_fp.write(summary + "\n")
                 log_fp.flush()
 
+
 if __name__ == "__main__":
     main()
-

@@ -6,7 +6,7 @@ from tqdm import tqdm
 from typing import Optional
 from utils import load_data
 import config
-
+import Literal
 SKIN_PROMPT = """You are a multimodal language model tasked with generating structured clinical interpretations of dermatologic images for training datasets. Use the following concise guidelines to ensure clarity, accuracy, and informativeness:
 
 1. Case context and body site:
@@ -62,7 +62,7 @@ Now here is the info:
 -----
 """
 
-OPT_PROMPT = """You are a multimodal language model tasked with generating structured clinical interpretations of ophthalmic images for training datasets. Use the following concise guidelines to ensure clarity, accuracy, and informativeness:
+OPH_PROMPT = """You are a multimodal language model tasked with generating structured clinical interpretations of ophthalmic images for training datasets. Use the following concise guidelines to ensure clarity, accuracy, and informativeness:
 
 1. Case context and eye information:
    - Identify laterality (OD, OS, OU) and any patient metadata in the text (age, sex, diagnosis labels, eye ID).
@@ -115,7 +115,7 @@ Now here is the info:
 """
 
 SKIN_CONTENT= "You are an expert assistant for dermatology dataset annotation."
-OPT_CONTENT= "You are an expert assistant for opthalmology dataset annotation."
+OPH_CONTENT= "You are an expert assistant for ophthalmology dataset annotation."
 
 # ---------------------------------------------------------------------
 # Constants
@@ -142,10 +142,10 @@ def build_request(
     Build a single OpenAI Batch API request object.
     """
     if task == "skin":
-        system_content = SKIN_SYSTEM_CONTENT
+        system_content = SKIN_CONTENT
         prompt = SKIN_PROMPT
     elif task == "ophthalmology":
-        system_content = OPH_SYSTEM_CONTENT
+        system_content = OPH_CONTENT
         prompt = OPH_PROMPT
     else:
         raise ValueError(f"Unknown task type: {task}")
