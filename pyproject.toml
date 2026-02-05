@@ -22,7 +22,7 @@ dependencies = [
     "hydra-core",
     "rich",
     "pydanclick",
-    "transformers",
+    "transformers<5.0.0",
     "einops",
     "clip==0.2.0",
     "pillow>=9.4.0",
