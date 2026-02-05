@@ -1,5 +1,5 @@
 from multimeditron.cli import EPILOG, main_cli
-from multimeditron.model.model import MultimodalConfig, MultiModalModelForCausalLM, bootstrap
+from multimeditron.model.model import ChatTemplate, MultiModalModelForCausalLM, bootstrap
 from multimeditron.model.data_loader import DataCollatorForMultimodal
 from multimeditron.train.trainer import MultimodalTrainer, TRAINING_MAPPING
 from multimeditron.profiling import NvtxAnnotationCallback
@@ -7,13 +7,10 @@ from transformers import AutoTokenizer, TrainingArguments
 from datasets import concatenate_datasets, load_dataset, load_from_disk
 from multimeditron.model.modalities import AutoModality
 from multimeditron.dataset.loader import AutoModalityLoader
-from multimeditron.model.model import MultiModalModelForCausalLM, MultimodalConfig, ChatTemplate
 from tqdm import tqdm as _tqdm
 from PIL import PngImagePlugin
 from datasets import config as datasets_config
-from pathlib import Path
 
-import deepspeed
 import torch
 import os
 import yaml
@@ -68,8 +65,6 @@ def build_datasets(config):
     return ds
 
 
-
-
 @main_cli.command(epilog=EPILOG)
 @click.option("--config", "-c", type=click.Path(exists=True), help="Path to the configuration file(s) in YAML format.")
 @click.option("--trust-remote-code/--no-trust-remote-code", default=False, help="Whether to trust remote code when loading models from HuggingFace.")
@@ -116,29 +111,9 @@ def train(config: str,
         loader_type = loader_copy.pop("loader_type")
         modality_type = loader_copy.pop("modality_type")
         modalities_loader[modality_type] = AutoModalityLoader.from_name(loader_type, **loader_copy)
-   
-
     
-
     if config_dict.get("base_model", None) is None:
-        # multimodal_config = MultimodalConfig(
-        #     hidden_size=config_dict["token_size"],
-        #     vocab_size=len(tokenizer),
-        #     eos_token_idx=tokenizer.convert_tokens_to_ids(tokenizer.eos_token),
-        #     modalities=modalities_config,
-        #     llm_path=config_dict["base_llm"],
-        #     truncation=config_dict.get("truncation", False),
-        #     max_sequence_length=config_dict.get("max_sequence_length", None),
-        # )
-        # model = MultiModalModelForCausalLM(multimodal_config)
-        # model.bootstrap()
-        from transformers.integrations.deepspeed import (
-            set_hf_deepspeed_config,
-            unset_hf_deepspeed_config,
-        )
-        unset_hf_deepspeed_config()
         model = bootstrap(config_dict, tokenizer, modalities_config)
-        set_hf_deepspeed_config(training_args.hf_deepspeed_config)
     else:
         # load starting weights from base_model (hub id or local checkpoint dir).
         model = MultiModalModelForCausalLM.from_pretrained(
@@ -156,7 +131,6 @@ def train(config: str,
     trainer_callbacks = []
     if os.environ.get('ENABLE_NSYS') == '1' and not os.environ.get('ENABLE_BENCHY') == '1':
         trainer_callbacks.append(NvtxAnnotationCallback())
-
     
     trainer = MultimodalTrainer(
             model=model,

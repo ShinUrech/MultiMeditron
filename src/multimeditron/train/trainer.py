@@ -33,7 +33,6 @@ class MultimodalTrainer(Trainer):
         eval_dataset=None,
         model_init=None,
         compute_metrics=None,
-        # on_the_fly_embedding: bool = True,
         callbacks=None,
         optimizers=(None, None),
         training_mode: TrainingMode = TrainingMode.ALIGNMENT,

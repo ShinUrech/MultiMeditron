@@ -129,6 +129,8 @@ class ImageModality(BaseModality):
 
         self.projector = MLPProjector(self.embedding_size, config.hidden_size, dtype=self.dtype)
 
+        self.post_init()
+
     def bootstrap_feature_extractor(self):
         self.feature_extractor = AutoModel.from_pretrained(self.vision_tower_name, trust_remote_code=True)
 

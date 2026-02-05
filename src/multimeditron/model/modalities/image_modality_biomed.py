@@ -1,4 +1,3 @@
-import deepspeed
 from transformers import AutoConfig, AutoImageProcessor, AutoModel
 from multimeditron.model.modalities.base import BaseModalityConfig
 
@@ -86,14 +85,18 @@ class BioMedCLIPImageModality(BaseModality):
         assert config.clip_name is not None
         
         self.feature_config = AutoConfig.from_pretrained(
-                config.clip_name,
-                trust_remote_code=config.trust_remote_code
+            config.clip_name,
+            trust_remote_code=config.trust_remote_code
         )
         
         self.feature_extractor = AutoModel.from_config(
-                self.feature_config,
-                trust_remote_code=config.trust_remote_code
+            self.feature_config,
+            trust_remote_code=config.trust_remote_code
         )
+        # self.feature_extractor = AutoModel.from_pretrained(
+        #     self.config.clip_name,
+        #     trust_remote_code=self.config.trust_remote_code
+        # )
 
         self.embedding_size = self.feature_config.vision_cfg["width"]
 
@@ -103,14 +106,16 @@ class BioMedCLIPImageModality(BaseModality):
             dtype=self.dtype,
         )
 
-        self.post_init()
+        # self.post_init()
+
+    # def _init_weights(self, module):
+    #     pass
 
     def bootstrap_feature_extractor(self):
-        with deepspeed.zero.Init(enabled=False):
-            self.feature_extractor = AutoModel.from_pretrained(
-                    self.config.clip_name,
-                    trust_remote_code=self.config.trust_remote_code
-            )
+        self.feature_extractor = AutoModel.from_pretrained(
+            self.config.clip_name,
+            trust_remote_code=self.config.trust_remote_code
+        )
 
     def forward(self, inputs) -> torch.FloatTensor:
         """
@@ -118,9 +123,6 @@ class BioMedCLIPImageModality(BaseModality):
         """
         x = torch.stack(inputs, dim=0).to(self.device)
 
-        # OpenCLIP ViT output: (B, D, P, P)
-        # D is the dimension of an embedding
-        # P is the number of patches
         res = self.feature_extractor.forward_intermediates(vision_inputs=x, normalize_intermediates=True)
         features = res["image_intermediates"][-1]
         features = features.flatten(start_dim=-2, end_dim=-1)

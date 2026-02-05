@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Generator, Optional, List, Union, Tuple, Any, Dict, Callable
 from transformers import PreTrainedModel, PretrainedConfig, AutoModel, AutoConfig, AutoProcessor, AutoModelForCausalLM
-from transformers.integrations.deepspeed import unset_hf_deepspeed_config
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from dataclasses import dataclass, field
 
@@ -274,37 +273,11 @@ class MultiModalModelForCausalLM(PreTrainedModel):
             self.processors_by_type[modality_config.modality_type] = processor
             self.modalities_with_projection.append(modality)
 
-        # Post init
-        self.post_init()
-
     def bootstrap(self):
         self.model = AutoModelForCausalLM.from_pretrained(self.config.llm_path)
         self.model.resize_token_embeddings(self.config.vocab_size, mean_resizing=False)
         for modality in self.modalities_with_projection:
             modality.bootstrap_feature_extractor()
-
-    def _init_weights(self, module):
-        """
-        Initialize weights for the model modules.
-
-        This method is called during model initialization to set initial values for
-        module parameters. Linear layers have their weights initialized from a normal
-        distribution and biases set to zero. Embedding layers also have their weights
-        initialized from a normal distribution, with special handling for padding indices.
-
-        Args:
-            module: The module whose weights should be initialized.
-        """
-        if isinstance(module, nn.Linear):
-            module.weight.data.normal_(
-                mean=0.0, std=self.config.initializer_range)
-            if module.bias is not None:
-                module.bias.data.zero_()
-        elif isinstance(module, nn.Embedding):
-            module.weight.data.normal_(
-                mean=0.0, std=self.config.initializer_range)
-            if module.padding_idx is not None:
-                module.weight.data[module.padding_idx].zero_()
 
     def freeze_for_alignment(self):
         """
@@ -683,8 +656,6 @@ class MultiModalModelForCausalLM(PreTrainedModel):
 
         return torch.cat(generated_tokens).transpose(1, 0)
 
-        
-
 def bootstrap(config, tokenizer, modalities_config):
     """
     Bootstrap the model and initialize the model as follows:
@@ -711,7 +682,7 @@ def bootstrap(config, tokenizer, modalities_config):
         max_sequence_length=config.get("max_sequence_length", None),
     )
 
-    model = MultiModalModelForCausalLM(multimodal_config)
+    model = AutoModel.from_config(multimodal_config)
     model.bootstrap()
 
     return model
