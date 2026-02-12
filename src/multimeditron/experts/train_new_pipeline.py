@@ -47,6 +47,7 @@ from transformers import (
     AutoTokenizer,
     HfArgumentParser,
     VisionTextDualEncoderModel,
+    VisionTextDualEncoderConfig,
     Trainer,
     TrainingArguments,
     set_seed,
@@ -54,6 +55,7 @@ from transformers import (
 
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils.versions import require_version
+from lion.modeling_clip import OpenCLIPVisionTextDualEncoderModel, VisionTextDualEncoderConfig
 
 import wandb
 
@@ -152,7 +154,9 @@ class DataTrainingArguments:
     dataset_configs: Optional[List[DatasetConfig]] = field(
         default=None, metadata={"help": "Dataset configuration for training and evaluation."}
     )
-
+    freeze: bool = field(
+        default=False, metadata={"help": "Whether to freeze the text encoder and image encoder weights during training."}
+    )
     max_seq_length: Optional[int] = field(
         default=512,
         metadata={
@@ -343,8 +347,7 @@ def training(model_args, data_args, training_args, dataset, n_freeze, last_check
     # 5. Load pretrained model, tokenizer, and image processor
     if model_args.vision_model_name and model_args.text_model_name:
         
-        if moderl_args.vision_model_name == "CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k":
-
+        if model_args.vision_model_name == "CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k":
             logger.info(f"Loading dual encoder with vision model {model_args.vision_model_name} ")
             model_id = "calpt/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k"
             config = VisionTextDualEncoderConfig.from_pretrained(model_id)
@@ -377,10 +380,20 @@ def training(model_args, data_args, training_args, dataset, n_freeze, last_check
                 cache_dir=model_args.cache_dir,
                 token=model_args.token,
             )
-        
+
+        if n_freeze > 0:
+            for i, layer in enumerate(model.vision_model.vision_model.encoder.layers):
+                if i < n_freeze:
+                    for param in layer.parameters():
+                        param.requires_grad = False
+
+            encoder = model.text_model.encoder
+            for i in range(n_freeze):
+                for param in encoder.layer[i].parameters():
+                    param.requires_grad = False
 
 
-    config = model.config
+        config = model.config
 
     # set seed for torch dataloaders
     set_seed(training_args.seed)
@@ -554,10 +567,14 @@ def training(model_args, data_args, training_args, dataset, n_freeze, last_check
 
 def objective(trial, bench_list, config_path):
     #bench_list is a list containing the list of benchmarks
+    model_args, data_args, training_args, dataset, last_checkpoint = data_processing(config_path)
     lr = trial.suggest_float("learning_rate", 5.0e-6, 5.0e-4)
     wd = trial.suggest_float("weight_decay", 0.05, 0.4)
-    n_frz = trial.suggest_int("freezed_layers", 0, 8)
-    model_args, data_args, training_args, dataset, last_checkpoint = data_processing(config_path)
+    if data_args.freeze :
+        n_frz = trial.suggest_int("freezed_layers", 0, 8)
+        print("nombre de layers freeze : " + str(n_frz))
+    else:
+        n_frz = 0
     training_args.learning_rate = lr
     training_args.weight_decay = wd
     training_args.output_dir = training_args.output_dir + "_lr" + str(lr) + "_wd" + str(wd) + "_nfrz" + str(n_frz)
