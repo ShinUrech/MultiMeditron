@@ -94,7 +94,7 @@ class MLP_eval(Benchmark):
                     optimizer.zero_grad()
                     y = model(inputs).to("cuda")
 
-                    l = criterion(y, lab.long().to("cuda"))
+                    l = criterion(y, lab.to("cuda"))
                     l.backward()
                 
                     optimizer.step()
@@ -137,6 +137,6 @@ class MLP_eval(Benchmark):
                     best_result=kfold_result
         print("best results with lr: " + str(best_lr)+ " and wd: " + str(best_wd))
         _, best_classifier = self.training(self.train_loader, best_lr, best_wd)
-        final_accuracy = self.evaluate_fold(best_classifier, self.test_loader)
-        print("test accuracy : " + str(final_accuracy))
-        return final_accuracy
+        final_result = self.evaluate_fold(best_classifier, self.test_loader)
+        print("test value : " + str(final_result))
+        return final_result

@@ -342,29 +342,41 @@ def data_processing(config_path):
 def training(model_args, data_args, training_args, dataset, n_freeze, last_checkpoint):
     # 5. Load pretrained model, tokenizer, and image processor
     if model_args.vision_model_name and model_args.text_model_name:
-        # Dual encoder path
-        logger.info(f"Loading dual encoder with vision model {model_args.vision_model_name} "
-                f"and text model {model_args.text_model_name}")
-
-        model = VisionTextDualEncoderModel.from_vision_text_pretrained(
-            model_args.vision_model_name,
-            model_args.text_model_name,
-            cache_dir=model_args.cache_dir,
-            token=model_args.token,
-        ).to(dtype=torch.bfloat16)
-                
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_args.text_model_name,
-            cache_dir=model_args.cache_dir,
-            use_fast=model_args.use_fast_tokenizer,
-            token=model_args.token,
-        )
         
-        image_processor = AutoImageProcessor.from_pretrained(
-            model_args.vision_model_name,
-            cache_dir=model_args.cache_dir,
-            token=model_args.token,
-        )
+        if moderl_args.vision_model_name == "CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k":
+
+            logger.info(f"Loading dual encoder with vision model {model_args.vision_model_name} ")
+            model_id = "calpt/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k"
+            config = VisionTextDualEncoderConfig.from_pretrained(model_id)
+            config.vision_config.hidden_act = "gelu"
+            model = OpenCLIPVisionTextDualEncoderModel.from_pretrained(model_id, config=config)
+            tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
+            image_processor = AutoImageProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+        else:
+        # Dual encoder path
+            logger.info(f"Loading dual encoder with vision model {model_args.vision_model_name} "
+                    f"and text model {model_args.text_model_name}")
+
+            model = VisionTextDualEncoderModel.from_vision_text_pretrained(
+                model_args.vision_model_name,
+                model_args.text_model_name,
+                cache_dir=model_args.cache_dir,
+                token=model_args.token,
+            ).to(dtype=torch.bfloat16)
+                    
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_args.text_model_name,
+                cache_dir=model_args.cache_dir,
+                use_fast=model_args.use_fast_tokenizer,
+                token=model_args.token,
+            )
+            
+            image_processor = AutoImageProcessor.from_pretrained(
+                model_args.vision_model_name,
+                cache_dir=model_args.cache_dir,
+                token=model_args.token,
+            )
         
 
 
