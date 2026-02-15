@@ -16,8 +16,23 @@ import sys
 import kagglehub
 from load_from_clip import load_model
 
+def randomize_csv(input_path, seed=None):
+    #function used to shuffle the dataset before using it for the benchmark
+
+    df = pd.read_csv(input_path)
+    
+    df_randomized = df.sample(frac=1, random_state=seed).reset_index(drop=True)
+    
+    base, ext = os.path.splitext(input_path)
+    output_path = f"{base}_randomized{ext}"
+    
+    df_randomized.to_csv(output_path, index=False)
+    
+    print(f"Nouveau fichier créé : {output_path}")
+
+
 def download_data():
-    # Download latest version
+    # Download the latest version of the NIH dataset used in this benchmark, the dataset still needs to be shuffled with the function randomize_csv 
     path = kagglehub.dataset_download("nih-chest-xrays/data")
 
     print("Path to dataset files:", path)
@@ -98,7 +113,7 @@ class XRay_benchmark(Benchmark):
     
     def __init__(self, is_lion_model):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.csv_path = "Randomize_Data_Entry_2017.csv"
+        self.csv_path = "Data_Entry_2017_randomized.csv"
         self.is_lion_model=is_lion_model
         with open(self.csv_path, 'r', encoding='utf-8') as f:
             self.sample_number = sum(1 for line in f)
