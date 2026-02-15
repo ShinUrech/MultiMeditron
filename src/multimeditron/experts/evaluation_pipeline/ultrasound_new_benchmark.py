@@ -14,7 +14,6 @@ from transformers import (
     AutoTokenizer,
     VisionTextDualEncoderConfig
 )
-import optuna
 from transformers import CLIPModel, CLIPProcessor
 from mlp_eval import MLP_eval
 from tqdm import tqdm
@@ -84,7 +83,7 @@ class BodyPartsDatasetTEST(Dataset):
             self.data = torch.cat([BUSI[0], CAMUS[0], COVIDUS[0], CT2[0], DDTI[0]], dim=0)
             self.labels = torch.cat([BUSI[1], CAMUS[1], COVIDUS[1], CT2[1], DDTI[1]], dim=0)
 
-            torch.save(self.data, save_path + "/data_emb_test_"+ model_name + ".pt")
+            torch.save(self.data, save_path + "/data_embl_test_"+ model_name + ".pt")
             torch.save(self.labels, save_path + "/data_lab_test_" + model_name + ".pt")
         else:
             self.data = torch.load(save_path + "/data_embl_test_"+ model_name +".pt")
@@ -110,7 +109,6 @@ def evaluate_pipeline(model, model_name):
     data_loader = DataLoader(dataset=train_dataset, batch_size=512)
     test_dataset = BodyPartsDatasetTEST(model, model_name, False, "/mloscratch/users/deschryv/clipFineTune/embeddings")
     print("test dataset loaded")
-    test_loader = DataLoader(dataset=test_dataset, batch_size=512)
     print("start of the mlp evaluation")
     labelsWEIGHT = np.array(train_dataset.labels)
     labelsWEIGHT = np.unique(labelsWEIGHT.astype(int))
