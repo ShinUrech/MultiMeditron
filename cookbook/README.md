@@ -147,18 +147,18 @@ source .env
 The data is available on huggingface at [OpenMeditron/MultiMediset](https://huggingface.co/datasets/OpenMeditron/MultiMediset). You can download the data by running:
 
 ```py
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_config_names
 import os
 
 STORAGE_ROOT = os.environ["STORAGE_ROOT"]
-DS_NUM_PROC = os.environ["DS_NUM_PROC"]
+DS_NUM_PROC = int(os.environ["DS_NUM_PROC"])
 
 dataset_name = "OpenMeditron/MultiMediset"
+configs = get_dataset_config_names(dataset_name)
 
-ds_dict = load_dataset(dataset_name, num_proc=DS_NUM_PROC)
-
-for split_name, split_dataset in ds_dict.items():
+for split_name in configs:
     split_dir = os.path.join(STORAGE_ROOT, split_name)
+    split_dataset = load_dataset(dataset_name, split_name, num_proc=DS_NUM_PROC)
     split_dataset.save_to_disk(split_dir)
 ```
 
