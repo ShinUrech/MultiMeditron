@@ -407,7 +407,7 @@ class MultiModalModelForCausalLM(PreTrainedModel):
         """
         self.model.set_input_embeddings(value)
 
-    def embed_modalities_with_text(self, input_ids: torch.Tensor, processed_multimodal_inputs: List[Dict[str, Any]]):
+    def embed_modalities_with_text(self, input_ids: torch.Tensor, processed_multimodal_inputs: Dict[str, Any]):
         """
         Embeds multimodal inputs alongside text tokens in a unified embedding space.
 
@@ -420,7 +420,7 @@ class MultiModalModelForCausalLM(PreTrainedModel):
 
         Args:
             input_ids (torch.Tensor): Token IDs for the text input, shape [batch_size, seq_len].
-            processed_multimodal_inputs (List[Dict[str, Any]]): Dictionary containing:
+            processed_multimodal_inputs (Dict[str, Any]): Dictionary containing:
                 - 'stacked': Dict mapping modality names to tensors of processed inputs
                 - 'batch_idx': Dict mapping modality names to batch indices for placement
                 - 'token_range': Dict mapping modality names to token indices for placement

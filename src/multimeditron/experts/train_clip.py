@@ -552,13 +552,14 @@ def main(config_path: str):
         test_dataset.set_transform(transform_images)
 
     # 8. Initialize our trainer
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=test_dataset if training_args.do_eval else None,
-        data_collator=collate_fn,
-    )
+    if training_args.do_train:
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=test_dataset if training_args.do_eval else None,
+            data_collator=collate_fn,
+        )
 
     # 9. Training
     if training_args.do_train:

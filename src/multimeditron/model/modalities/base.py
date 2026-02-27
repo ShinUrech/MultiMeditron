@@ -177,45 +177,45 @@ class AutoModality:
         raise RuntimeError("AutoModality should not be instantiated directly. Please use the 'from_name' method.")
     
     @classmethod
-    def register(c, name: str):
-        def decorator(cls):
-            if not issubclass(cls, BaseModality):
-                raise ValueError(f"Class {cls.__name__} must inherit from BaseModality to be registered.")
-            if name in c._registry:
+    def register(cls, name: str):
+        def decorator(cls_intern):
+            if not issubclass(cls_intern, BaseModality):
+                raise ValueError(f"Class {cls_intern.__name__} must inherit from BaseModality to be registered.")
+            if name in cls._registry:
                 raise ValueError(f"Modality name '{name}' is already registered.")
-            if not hasattr(cls, "preprocessor_class") or cls.preprocessor_class is None:
-                raise ValueError(f"Modality class '{cls.__name__}' must define a 'preprocessor_class' attribute.")
-            c._registry[name] = cls
-            setattr(cls.config_class, "model_type", name)
+            if not hasattr(cls_intern, "preprocessor_class") or cls_intern.preprocessor_class is None:
+                raise ValueError(f"Modality class '{cls_intern.__name__}' must define a 'preprocessor_class' attribute.")
+            cls._registry[name] = cls_intern
+            setattr(cls_intern.config_class, "model_type", name)
 
-            AutoConfig.register(name, cls)
-            AutoModel.register(cls.config_class, cls)
-            AutoProcessor.register(cls.config_class, cls.preprocessor_class)
+            AutoConfig.register(name, cls_intern)
+            AutoModel.register(cls_intern.config_class, cls_intern)
+            AutoProcessor.register(cls_intern.config_class, cls_intern.preprocessor_class)
 
-            return cls
+            return cls_intern
         return decorator
 
     @classmethod
-    def from_pretrained(c, *args, **kwargs) -> BaseModality:
+    def from_pretrained(cls, *args, **kwargs) -> BaseModality:
         model = AutoModel.from_pretrained(*args, **kwargs)
         if not isinstance(model, BaseModality):
-            raise ValueError(f"Model loaded is not an instance of BaseModality. Got {type(model)}. Available values are {list(c._registry.keys())}")
+            raise ValueError(f"Model loaded is not an instance of BaseModality. Got {type(model)}. Available values are {list(cls._registry.keys())}")
         return model
     
     @classmethod
-    def preprocessor_from_name(c, name: str, *args, **kwargs) -> BaseModalityProcessor:
-        if name not in c._registry:
-            raise ValueError(f"Modality name '{name}' is not registered. Available values are {list(c._registry.keys())}")
-        preprocessor_class = c._registry[name].preprocessor_class
+    def preprocessor_from_name(cls, name: str, *args, **kwargs) -> BaseModalityProcessor:
+        if name not in cls._registry:
+            raise ValueError(f"Modality name '{name}' is not registered. Available values are {list(cls._registry.keys())}")
+        preprocessor_class = cls._registry[name].preprocessor_class
         assert preprocessor_class is not None, f"Modality class '{name}' does not have a preprocessor_class defined."
         return preprocessor_class(*args, **kwargs)
 
     @classmethod
-    def config_from_dict(c, config: dict, **kwargs) -> BaseModalityConfig:
+    def config_from_dict(cls, config: dict, **kwargs) -> BaseModalityConfig:
         assert "model_type" in config, "Config dictionary must contain a 'model_type' key."
-        if config["model_type"] not in c._registry:
-            raise ValueError(f"Modality name '{config['model_type']}' is not registered. Available values are {list(c._registry.keys())}")
-        config_class = c._registry[config["model_type"]].config_class
+        if config["model_type"] not in cls._registry:
+            raise ValueError(f"Modality name '{config['model_type']}' is not registered. Available values are {list(cls._registry.keys())}")
+        config_class = cls._registry[config["model_type"]].config_class
         assert config_class is not None, f"Modality class '{config['model_type']}' does not have a config_class defined."
         modality_config = config_class.from_dict(config, **kwargs)
         
