@@ -142,7 +142,7 @@ In your terminal, run:
 source .env
 ```
 
-### Download data
+### Download data (optional if you are part of the LiGHT organization in the CSCS)
 
 The data is available on huggingface at [OpenMeditron/MultiMediset](https://huggingface.co/datasets/OpenMeditron/MultiMediset). You can download the data by running:
 
