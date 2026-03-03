@@ -20,6 +20,8 @@ modalities:
       - ClosedMeditron/MedExpert-Ultrasound
       - ClosedMeditron/MedExpert-Xray
       - ClosedMeditron/clip-vit-base-patch32 
+      - /capstor/store/cscs/swissai/a127/meditron/models/CLIP/OphthalmologyExpert # Path to Ophtho
+      - /capstor/store/cscs/swissai/a127/meditron/models/CLIP/SkinExpert # Path to Skin
     generalist_idx : -1
     gating_path: ClosedMeditron/MultiMeditron-Gating
     fusion_method: cross_attn
@@ -32,6 +34,7 @@ datasets:
   - packed_path: $STORAGE_ROOT/pixmo_anything
   - packed_path: $STORAGE_ROOT/pixmo_cap
   - packed_path: $STORAGE_ROOT/medtrinity_conversations_1_formatted_alignment
+  #TODO: add the ophtalmology and skin datasets when Fabrice adds them 
 
 training_args:
   output_dir: $MODEL_ROOT/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment
