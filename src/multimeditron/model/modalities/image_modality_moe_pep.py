@@ -1,6 +1,6 @@
 from multimeditron.model.constants import NUM_EMBEDDINGS_KEY, MODALITY_VALUE_KEY
 from multimeditron.model.modalities import AutoModality, BaseModality, BaseModalityConfig, BaseModalityProcessor
-from multimeditron.model.modalities.moe.gating import GatingNetwork
+from multimeditron.model.modalities.moe.gating import GatingNetwork, GatingNetworkConfig
 from multimeditron.model.projectors.mlp import MLPProjector
 from multimeditron.model.attention import CrossAttention
 import torch
@@ -158,7 +158,16 @@ class MOEImageModalityPEP(BaseModality):
 
         self.generalist_idx = config.generalist_idx
         self.fusion_method = config.fusion_method
-        self.gating_network = GatingNetwork.from_pretrained(config.gating_path)
+        if config.gating_path:
+            self.gating_network = GatingNetwork.from_pretrained(config.gating_path)
+        else:
+            gate_cfg = GatingNetworkConfig(
+                num_classes=len(self.experts),
+                top_k=config.top_k_experts,
+                image_processor_path=config.image_processor,
+                class_names=list(self.expert_names),
+            )
+            self.gating_network = GatingNetwork(gate_cfg)
 
         # build perm[class_idx] = expert_idx so we can align gating → experts
         gate_class_names: List[str] = getattr(self.gating_network.config, "class_names", []) or []
@@ -218,11 +227,15 @@ class MOEImageModalityPEP(BaseModality):
         elif self.fusion_method == "cross_attn":
             # query=generalist → cross-attn over specialists
             B, E, P, C = stacked_expert_outputs.shape
+            
+            # resolve negative indices
+            generalist_idx_resolved = self.generalist_idx if self.generalist_idx >= 0 else E + self.generalist_idx
+            
             # generalist tokens as queries: [B, P, C]
-            q = stacked_expert_outputs[:, self.generalist_idx, :, :]
+            q = stacked_expert_outputs[:, generalist_idx_resolved, :, :]
 
             # specialist indices (all except generalist)
-            specialist_indices = [i for i in range(E) if i != self.generalist_idx]  # just in case order changes
+            specialist_indices = [i for i in range(E) if i != generalist_idx_resolved]  # just in case order changes
 
             # align gating weights to expert order
             perm = self._gating_to_expert_perm

@@ -1,7 +1,7 @@
 import torch
 from multimeditron.model.constants import NUM_EMBEDDINGS_KEY, MODALITY_VALUE_KEY
 from multimeditron.model.modalities import AutoModality, BaseModality, BaseModalityConfig, BaseModalityProcessor
-from multimeditron.model.modalities.moe.gating import GatingNetwork
+from multimeditron.model.modalities.moe.gating import GatingNetwork, GatingNetworkConfig
 from multimeditron.model.projectors.mlp import MLPProjector
 from multimeditron.model.attention import CrossAttention
 from transformers import AutoModel, AutoImageProcessor, AutoConfig, AutoImageProcessor, AutoConfig
@@ -120,7 +120,16 @@ class MOEImageModality(BaseModality):
         self._num_patches_per_entry = (self.experts[0].config.image_size // self.experts[0].config.patch_size) ** 2
         self.generalist_idx = config.generalist_idx
         self.fusion_method = config.fusion_method
-        self.gating_network = GatingNetwork.from_pretrained(config.gating_path)
+        if config.gating_path:
+            self.gating_network = GatingNetwork.from_pretrained(config.gating_path)
+        else:
+            gate_cfg = GatingNetworkConfig(
+                num_classes=len(self.experts),
+                top_k=config.top_k_experts,
+                image_processor_path=config.image_processor,
+                class_names=list(self.expert_names),
+            )
+            self.gating_network = GatingNetwork(gate_cfg)
 
         gate_class_names: List[str] = getattr(self.gating_network.config, "class_names", []) or []
         if gate_class_names:

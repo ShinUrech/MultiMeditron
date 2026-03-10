@@ -22,14 +22,19 @@ import multiprocessing
 import click
 import logging
 import json
+import ast
 
 logger = logging.getLogger(__name__)
 
 PngImagePlugin.MAX_TEXT_CHUNK = 2 ** 30
 
 def is_dataset_folder(folder: str) -> bool:
-    return os.path.exists(os.path.join(folder, datasets_config.DATASET_INFO_FILENAME)) and \
+    # Plain Dataset: has dataset_info.json + state.json at root
+    is_plain = os.path.exists(os.path.join(folder, datasets_config.DATASET_INFO_FILENAME)) and \
         os.path.exists(os.path.join(folder, datasets_config.DATASET_STATE_JSON_FILENAME))
+    # DatasetDict: has dataset_dict.json at root
+    is_dict = os.path.exists(os.path.join(folder, "dataset_dict.json"))
+    return is_plain or is_dict
 
 def is_jsonl(path: str) -> bool:
     filename, extension = os.path.splitext(path)
@@ -60,6 +65,10 @@ def build_datasets(config):
         print(ds_config["packed_path"])
         if is_dataset_folder(ds_config["packed_path"]):
             dataset = load_from_disk(ds_config['packed_path'])
+            # DatasetDict (e.g. has train/val splits) — use the train split
+            from datasets import DatasetDict
+            if isinstance(dataset, DatasetDict):
+                dataset = dataset['train']
         else:
             dataset = load_dataset(ds_config["packed_path"], num_proc=num_proc)["train"]
         packed_datasets.append(dataset)
@@ -199,3 +208,14 @@ def train(config: str,
     
     if torch.distributed.is_available() and torch.distributed.is_initialized():
         torch.distributed.barrier()
+
+    for data_path in data_paths:
+        ds = load_dataset(data_path, split="train")
+
+        if text_is_list and "text" in ds.column_names and hasattr(ds.features["text"], "dtype") and ds.features["text"].dtype == "string":
+            logger.info("Converting 'text' column from string to list using ast.literal_eval.")
+            ds = ds.map(
+                lambda row: {"text": [ast.literal_eval(row["text"])]},
+                num_proc=16,
+                desc="Converting 'text' column from string to list.",
+            )
