@@ -224,12 +224,17 @@ class MOEImageModalityPEP(BaseModality):
             # specialist indices (all except generalist)
             specialist_indices = [i for i in range(E) if i != self.generalist_idx]  # just in case order changes
 
-            # align gating weights to expert order
-            perm = self._gating_to_expert_perm
-            w_all = weights.index_select(dim=-1, index=perm)  # [B, E]
+            # align gating weights to expert order:
+            # _gating_to_expert_perm maps gating_class_i -> expert_list_idx.
+            # Build a full [B, E] weight tensor so experts not in the gating
+            # network (e.g. new specialists) receive an initial weight of 0.
+            perm = self._gating_to_expert_perm  # [num_gating_classes]
+            w_all = torch.zeros(B, E, dtype=weights.dtype, device=weights.device)
+            w_all[:, perm] = weights            # scatter known gating weights
 
-            # keep only specialists’ weights and softmax across them
-            w_spec = w_all[:, specialist_indices]             # [B, E_spec] (E_spec = 4)
+            # keep only specialists' weights and softmax across them
+            spec_idx = torch.tensor(specialist_indices, dtype=torch.long, device=weights.device)
+            w_spec = w_all[:, spec_idx]         # [B, E_spec]
             w_spec = torch.softmax(w_spec, dim=-1)
 
             # build weighted expert contexts: list of [B, P, C]
