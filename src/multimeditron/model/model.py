@@ -257,7 +257,7 @@ class MultiModalModelForCausalLM(PreTrainedModel):
                     torch_dtype=dtype
                 )
             self.model = AutoModelForCausalLM.from_config(
-                config=llm_config, attn_implementation="eager")
+                config=llm_config, attn_implementation="flash_attention_2")
 
         self.model.resize_token_embeddings(config.vocab_size, mean_resizing=False)
 

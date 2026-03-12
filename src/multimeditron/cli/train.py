@@ -126,16 +126,22 @@ def train(config: str,
         modality_type = loader_copy.pop("modality_type")
         modalities_loader[modality_type] = AutoModalityLoader.from_name(loader_type, **loader_copy)
 
-    with deepspeed.zero.Init(dtype=torch.bfloat16):
+    def _build_model():
         if config_dict.get("base_model", None) is None:
-            model = bootstrap(config_dict, tokenizer, modalities_config)
+            return bootstrap(config_dict, tokenizer, modalities_config)
         else:
             # load starting weights from base_model (hub id or local checkpoint dir).
-            model = MultiModalModelForCausalLM.from_pretrained(
+            return MultiModalModelForCausalLM.from_pretrained(
                 config_dict["base_model"], 
                 truncation=config_dict.get("truncation", False),
                 max_sequence_length=config_dict.get("max_sequence_length", None)
             )
+
+    if config_dict.get("training_args", {}).get("deepspeed", None):
+        with deepspeed.zero.Init(dtype=torch.bfloat16):
+            model = _build_model()
+    else:
+        model = _build_model()
 
     model.train()
     processors = model.processors()
@@ -173,7 +179,10 @@ def train(config: str,
     wandb_run_id = config_dict.get("wandb_run_id", None)  # string or None
     resume_flag = bool(config_dict.get("resume_from_checkpoint", False))
 
-    if is_main_process():
+    report_to = config_dict.get("training_args", {}).get("report_to", "wandb")
+    use_wandb = report_to != "none" and (report_to == "wandb" or (isinstance(report_to, list) and "wandb" in report_to))
+
+    if is_main_process() and use_wandb:
         wandb_kwargs = dict(
             project="MultiMeditron",
             config=config_dict,
@@ -189,9 +198,11 @@ def train(config: str,
         wandb_run = wandb.init(**wandb_kwargs)
 
         # attach deepspeed config
-        with open(config_dict["training_args"]["deepspeed"], "r") as ds_file:
-            deepspeed_config = json.load(ds_file)
-        wandb_run.config.update({"deepspeed_config": deepspeed_config})
+        ds_path = config_dict.get("training_args", {}).get("deepspeed", None)
+        if ds_path:
+            with open(ds_path, "r") as ds_file:
+                deepspeed_config = json.load(ds_file)
+            wandb_run.config.update({"deepspeed_config": deepspeed_config})
 
     # === Train (resume or fresh) ===
     if resume_flag:
@@ -208,14 +219,3 @@ def train(config: str,
     
     if torch.distributed.is_available() and torch.distributed.is_initialized():
         torch.distributed.barrier()
-
-    for data_path in data_paths:
-        ds = load_dataset(data_path, split="train")
-
-        if text_is_list and "text" in ds.column_names and hasattr(ds.features["text"], "dtype") and ds.features["text"].dtype == "string":
-            logger.info("Converting 'text' column from string to list using ast.literal_eval.")
-            ds = ds.map(
-                lambda row: {"text": [ast.literal_eval(row["text"])]},
-                num_proc=16,
-                desc="Converting 'text' column from string to list.",
-            )
