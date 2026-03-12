@@ -2,7 +2,7 @@
 #SBATCH --job-name multimeditron-stage1
 #SBATCH --output /users/surech/meditron/reports/R-%x.%j.out
 #SBATCH --error /users/surech/meditron/reports/R-%x.%j.err
-#SBATCH --nodes 1
+#SBATCH --nodes 8
 #SBATCH --ntasks-per-node 1
 #SBATCH --gres gpu:4
 #SBATCH --cpus-per-task 288
@@ -13,6 +13,13 @@ export WANDB_DIR=/capstor/store/cscs/swissai/a127/homes/surech/wandb
 export WANDB_MODE=offline
 export HF_HOME=/capstor/store/cscs/swissai/a127/meditron/hf_cache
 export HF_TOKEN=${HF_TOKEN:?"HF_TOKEN is not set. Set it in your environment or ~/.bashrc"}
+
+# NCCL / distributed settings
+export NCCL_DEBUG=INFO
+export NCCL_TIMEOUT=1800
+export TORCH_NCCL_AVOID_RECORD_STREAMS=1
+export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
+export NCCL_NET_GDR_LEVEL=0
 
 # Load user's source tree first so edits to src/ take effect inside the container
 # (the container bakes its own copy at /workspace/MultiMeditron; /users is bind-mounted)
@@ -50,6 +57,7 @@ SRUN_ARGS=" \
   --jobid $SLURM_JOB_ID \
   --wait 60 \
   --environment /users/surech/.edf/multimeditron.toml \
+  --export=ALL,NCCL_NET_GDR_LEVEL=0 \
   "
 
 srun $SRUN_ARGS bash -c "$CMD"
