@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name multimeditron-stage1
+#SBATCH --job-name multimeditron-train
 #SBATCH --output /users/surech/meditron/reports/R-%x.%j.out
 #SBATCH --error /users/surech/meditron/reports/R-%x.%j.err
 #SBATCH --nodes 8
@@ -8,6 +8,16 @@
 #SBATCH --cpus-per-task 288
 #SBATCH --time 11:59:59
 #SBATCH -A a127
+
+# Usage:
+#   sbatch sbatch_train.sh <config_path>
+#
+# Examples:
+#   Stage 1:  sbatch sbatch_train.sh cookbook/sft/moe/attn/pep/stage1_alignment.yaml
+#   Stage 2:  sbatch sbatch_train.sh cookbook/sft/moe/attn/pep/stage2_end2end.yaml
+#   Debug:    sbatch --partition=debug --nodes=4 --time=00:30:00 sbatch_train.sh cookbook/sft/moe/attn/pep/stage1_alignment_debug.yaml
+
+CONFIG=${1:?"Usage: sbatch [--partition=debug --nodes=N --time=HH:MM:SS] sbatch_train.sh <config_path>"}
 
 export WANDB_DIR=/capstor/store/cscs/swissai/a127/homes/surech/wandb
 export WANDB_MODE=offline
@@ -21,19 +31,16 @@ export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 export NCCL_NET_GDR_LEVEL=0
 
-# Load user's source tree first so edits to src/ take effect inside the container
-# (the container bakes its own copy at /workspace/MultiMeditron; /users is bind-mounted)
+# Load user's source tree so edits to src/ take effect inside the container
 export PYTHONPATH=/users/surech/meditron/MultiMeditron/src:$PYTHONPATH
 
-CONFIG=/users/surech/meditron/MultiMeditron/cookbook/sft/moe/attn/pep/stage1_alignment.yaml
-
 echo "START TIME: $(date)"
+echo "NODES:  $SLURM_NNODES"
+echo "CONFIG: $CONFIG"
 set -eo pipefail
 set -x
 
 GPUS_PER_NODE=4
-echo "NODES: $SLURM_NNODES"
-
 MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 MASTER_PORT=6200
 
@@ -49,8 +56,6 @@ LAUNCHER="
   "
 
 CMD="$LAUNCHER -m multimeditron train --config $CONFIG"
-
-echo $CMD
 
 SRUN_ARGS=" \
   --cpus-per-task $SLURM_CPUS_PER_TASK \

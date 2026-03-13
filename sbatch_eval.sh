@@ -9,32 +9,34 @@
 #SBATCH --time 05:59:59
 #SBATCH -A a127
 
-export HF_HOME=/capstor/store/cscs/swissai/a127/meditron/hf_cache
-export HF_TOKEN=${HF_TOKEN:?"HF_TOKEN is not set. Set it in your environment or ~/.bashrc"}
+# Usage:
+#   sbatch sbatch_eval.sh <checkpoint> [tokenizer] [tasks] [limit] [num_proc]
+#
+# Examples:
+#   Full eval:   sbatch sbatch_eval.sh /path/to/checkpoint llama gmai,slake,path_vqa
+#   Quick test:  sbatch --partition=debug --time=00:29:59 sbatch_eval.sh /path/to/checkpoint llama gmai 20
 
-# Load user's source tree and lmms-eval
-export PYTHONPATH=/users/surech/meditron/MultiMeditron/src:/users/surech/meditron/MultiMeditron/third-party/lmms-eval:$PYTHONPATH
-
-# ──────────────────────────────────────────────────
-# CONFIGURE THESE before submitting:
-#   CHECKPOINT  = path to the trained model checkpoint
-#   TOKENIZER   = llama | apertus | qwen3
-#   TASKS       = comma-separated list of benchmarks
-# ──────────────────────────────────────────────────
-CHECKPOINT=${1:?"Usage: sbatch sbatch_eval.sh <checkpoint_path> [tokenizer_type] [tasks] [num_proc]"}
+CHECKPOINT=${1:?"Usage: sbatch sbatch_eval.sh <checkpoint_path> [tokenizer] [tasks] [limit] [num_proc]"}
 TOKENIZER=${2:-llama}
 TASKS=${3:-gmai,slake,path_vqa}
-# Use 1 process + device_map=auto so the model is spread across all GPUs on a
-# single process. Using >1 process with device_map=auto causes each process to
-# compete for all GPUs simultaneously, leading to OOM or incorrect evaluation.
-NUM_PROC=${4:-1}
+LIMIT=${4:-}
+NUM_PROC=${5:-1}
+
+export HF_HOME=/capstor/store/cscs/swissai/a127/meditron/hf_cache
+export HF_TOKEN=${HF_TOKEN:?"HF_TOKEN is not set"}
+
+export PYTHONPATH=/users/surech/meditron/MultiMeditron/src:/users/surech/meditron/MultiMeditron/third-party/lmms-eval:$PYTHONPATH
 
 echo "START TIME: $(date)"
 echo "CHECKPOINT: $CHECKPOINT"
 echo "TOKENIZER:  $TOKENIZER"
 echo "TASKS:      $TASKS"
+echo "LIMIT:      ${LIMIT:-all}"
 set -eo pipefail
 set -x
+
+LIMIT_ARG=""
+[ -n "$LIMIT" ] && LIMIT_ARG="--limit $LIMIT"
 
 srun \
   --cpus-per-task $SLURM_CPUS_PER_TASK \
@@ -48,6 +50,8 @@ srun \
     --model multimeditron \
     --model_args pretrained="$CHECKPOINT",tokenizer_type="$TOKENIZER",device_map="auto" \
     --tasks $TASKS \
-    --batch_size 1
+    --batch_size 1 \
+    $LIMIT_ARG \
+    --output_path /users/surech/meditron/reports/lmms_eval_results
 
 echo "END TIME: $(date)"

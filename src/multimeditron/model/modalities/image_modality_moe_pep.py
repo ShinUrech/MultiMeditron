@@ -158,19 +158,22 @@ class MOEImageModalityPEP(BaseModality):
 
         self.generalist_idx = config.generalist_idx
         self.fusion_method = config.fusion_method
-        self.gating_network = GatingNetwork.from_pretrained(config.gating_path)
 
-        # build perm[class_idx] = expert_idx so we can align gating → experts
-        gate_class_names: List[str] = getattr(self.gating_network.config, "class_names", []) or []
-        if gate_class_names:
-            name_to_expert_idx = {name: i for i, name in enumerate(self.expert_names)}
-            try:
-                perm_list = [name_to_expert_idx[name] for name in gate_class_names]
-            except KeyError as e:
-                raise ValueError(f"Gating class name {e} not found in expert_clip_names: {self.expert_names}")
+        if config.gating_path:
+            self.gating_network = GatingNetwork.from_pretrained(config.gating_path)
+            # build perm[class_idx] = expert_idx so we can align gating → experts
+            gate_class_names: List[str] = getattr(self.gating_network.config, "class_names", []) or []
+            if gate_class_names:
+                name_to_expert_idx = {name: i for i, name in enumerate(self.expert_names)}
+                try:
+                    perm_list = [name_to_expert_idx[name] for name in gate_class_names]
+                except KeyError as e:
+                    raise ValueError(f"Gating class name {e} not found in expert_clip_names: {self.expert_names}")
+            else:
+                perm_list = list(range(len(self.experts)))
         else:
-            num_experts = len(self.experts)
-            perm_list = list(range(num_experts))
+            self.gating_network = None
+            perm_list = list(range(len(self.experts)))
 
         # register permutation as a non-persistent buffer
         self.register_buffer("_gating_to_expert_perm", torch.tensor(perm_list, dtype=torch.long), persistent=False)
@@ -191,8 +194,14 @@ class MOEImageModalityPEP(BaseModality):
     def forward(self, inputs) -> torch.Tensor:
         inputs = torch.stack(inputs, dim=0).to(self.device)  # (B, C, H, W)
 
-        _logits, _topk_indices, weights = self.gating_network(inputs)  # weights: (B, E)
-        
+        # Use uniform weights when no gating network is configured
+        if self.gating_network is not None:
+            _logits, _topk_indices, weights = self.gating_network(inputs)  # weights: (B, E)
+        else:
+            B = inputs.shape[0]
+            E = len(self.experts)
+            weights = torch.ones(B, E, dtype=inputs.dtype, device=inputs.device) / E
+
         # Use all experts: project per expert, then fuse
         expert_outputs = []
         for expert, projector in zip(self.experts, self.projectors):
@@ -260,31 +269,33 @@ class MOEImageModalityPEP(BaseModality):
     def train(self, mode: bool = True):
         super().train(mode)
 
-        if self.modality_frozen:
+        if self.modality_frozen and self.gating_network is not None:
             self.gating_network.eval()
 
         return self
 
     def freeze_modality_embedder(self):
-        for params in self.gating_network.parameters():
-            params.requires_grad = False
+        if self.gating_network is not None:
+            for params in self.gating_network.parameters():
+                params.requires_grad = False
+            self.gating_network.eval()
 
         for expert in self.experts:
             for params in expert.parameters():
                 params.requires_grad = False
 
-        self.gating_network.eval()
         self.modality_frozen = True
         
     def unfreeze_modality_embedder(self):
-        for params in self.gating_network.parameters():
-            params.requires_grad = True
+        if self.gating_network is not None:
+            for params in self.gating_network.parameters():
+                params.requires_grad = True
+            self.gating_network.train()
 
         for expert in self.experts:
             for params in expert.parameters():
                 params.requires_grad = True
 
-        self.gating_network.train()
         self.modality_frozen = False
 
     
