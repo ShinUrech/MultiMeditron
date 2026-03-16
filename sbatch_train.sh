@@ -65,5 +65,13 @@ SRUN_ARGS=" \
   --export=ALL,NCCL_NET_GDR_LEVEL=0 \
   "
 
+GPU_LOG_DIR=/users/surech/meditron/reports/gpu-util-${SLURM_JOB_ID}
+mkdir -p "$GPU_LOG_DIR"
+echo "GPU utilization log (this node): $GPU_LOG_DIR/node-0.log"
+nvidia-smi dmon -s u -d 5 > "$GPU_LOG_DIR/node-0.log" 2>&1 &
+GPU_MONITOR_PID=$!
+
 srun $SRUN_ARGS bash -c "$CMD"
+
+kill $GPU_MONITOR_PID 2>/dev/null || true
 echo "END TIME: $(date)"
