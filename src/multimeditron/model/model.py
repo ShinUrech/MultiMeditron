@@ -254,7 +254,7 @@ class MultiModalModelForCausalLM(PreTrainedModel):
         else:
             llm_config = AutoConfig.from_pretrained(
                     config.llm_path,
-                    torch_dtype=dtype
+                    dtype=dtype
                 )
             self.model = AutoModelForCausalLM.from_config(
                 config=llm_config, attn_implementation="flash_attention_2")
