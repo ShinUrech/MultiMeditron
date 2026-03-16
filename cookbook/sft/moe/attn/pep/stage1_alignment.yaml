@@ -1,6 +1,6 @@
 base_llm: /capstor/store/cscs/swissai/a127/meditron/hf_cache/hub/models--OpenMeditron--Meditron3-8B/snapshots/15914bcb040cd1a4f263afcd85b84f09ad2efd95
 base_model: null
-resume_from_checkpoint: false
+resume_from_checkpoint: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment/checkpoint-90
 wandb_run_id: null
 attachment_token: <|reserved_special_token_0|>
 tokenizer_type: llama

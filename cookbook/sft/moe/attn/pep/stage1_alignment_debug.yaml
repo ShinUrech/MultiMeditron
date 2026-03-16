@@ -1,4 +1,4 @@
-base_llm: meta-llama/Llama-3.1-8B-Instruct
+base_llm: /capstor/store/cscs/swissai/a127/meditron/hf_cache/hub/models--OpenMeditron--Meditron3-8B/snapshots/15914bcb040cd1a4f263afcd85b84f09ad2efd95
 base_model: null
 resume_from_checkpoint: false
 wandb_run_id: null
@@ -15,17 +15,17 @@ modalities:
     image_processor: /users/surech/meditron/MultiMeditron/models/CLIP/clip-vit-base-patch32
     hidden_size: 4096
     expert_clip_names:
-      - /capstor/store/cscs/swissai/a127/meditron/models/openai/clip-vit-base-patch32
+      - ClosedMeditron/MedExpert-CT
+      - ClosedMeditron/MedExpert-MRI
+      - ClosedMeditron/MedExpert-Ultrasound
+      - ClosedMeditron/MedExpert-Xray
+      - ClosedMeditron/clip-vit-base-patch32
       - /capstor/store/cscs/swissai/a127/meditron/models/CLIP/OphthalmologyExpert
       - /capstor/store/cscs/swissai/a127/meditron/models/CLIP/SkinExpert
-      - /capstor/store/cscs/swissai/a127/meditron/models/CLIP/UltraSoundCLIP/checkpoint-4350
-      - /users/surech/meditron/MultiMeditron/models/CLIP/ClosedMeditron/MedExpert-CT
-      - /users/surech/meditron/MultiMeditron/models/CLIP/ClosedMeditron/MedExpert-MRI
-      - /users/surech/meditron/MultiMeditron/models/CLIP/ClosedMeditron/MedExpert-Xray
-    generalist_idx: 0
-    gating_path: ""
+    generalist_idx : -1
+    gating_path: ClosedMeditron/MultiMeditron-Gating
     fusion_method: cross_attn
-    top_k_experts: 3
+    top_k_experts: 5
 
 training_mode: ALIGNMENT
 
@@ -38,7 +38,7 @@ datasets:
   - packed_path: /capstor/store/cscs/swissai/a127/meditron/multimediset/arrow/skin_dataset_converted
 
 training_args:
-  output_dir: /users/surech/meditron/MultiMeditron/models/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment-debug
+  output_dir: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment-debug
   run_name:   MultiMeditron-8B-attn-pep-alignment-debug
   dataloader_num_workers: 16
   dataloader_prefetch_factor: 4

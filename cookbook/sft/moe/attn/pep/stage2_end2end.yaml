@@ -1,6 +1,6 @@
 base_llm: /capstor/store/cscs/swissai/a127/meditron/hf_cache/hub/models--OpenMeditron--Meditron3-8B/snapshots/15914bcb040cd1a4f263afcd85b84f09ad2efd95
-base_model: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment/checkpoint-90
-resume_from_checkpoint: false
+base_model: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end/checkpoint-500
+resume_from_checkpoint: true
 wandb_run_id: null
 attachment_token: <|reserved_special_token_0|>
 tokenizer_type: llama
@@ -57,7 +57,7 @@ training_args:
   gradient_checkpointing_kwargs:
     use_reentrant: true
   save_strategy: steps
-  save_steps: 50
+  save_steps: 200
   save_total_limit: 5
   max_grad_norm: 1.0
   deepspeed: /users/surech/meditron/MultiMeditron/config/deepspeed_fast.json
