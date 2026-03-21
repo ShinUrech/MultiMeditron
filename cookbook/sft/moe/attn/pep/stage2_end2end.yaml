@@ -1,5 +1,5 @@
 base_llm: /capstor/store/cscs/swissai/a127/meditron/hf_cache/hub/models--OpenMeditron--Meditron3-8B/snapshots/15914bcb040cd1a4f263afcd85b84f09ad2efd95
-base_model: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end/checkpoint-500
+base_model: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end/checkpoint-900
 resume_from_checkpoint: true
 wandb_run_id: null
 attachment_token: <|reserved_special_token_0|>
@@ -50,8 +50,8 @@ training_args:
   ddp_find_unused_parameters: false
   learning_rate: 1.0e-5
   bf16: true
-  per_device_train_batch_size: 4
-  gradient_accumulation_steps: 4
+  per_device_train_batch_size: 8
+  gradient_accumulation_steps: 2
   num_train_epochs: 1
   gradient_checkpointing: true
   gradient_checkpointing_kwargs:
