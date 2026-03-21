@@ -192,12 +192,12 @@ class MultimodalConfig(PretrainedConfig):
         for modality_dict in modalities_dict_list:
             modalities.append(AutoModality.config_from_dict(modality_dict))
 
-        if kwargs["return_unused_kwargs"]:
+        if kwargs.get("return_unused_kwargs", False):
             config, kwargs = super().from_dict(config_dict, **kwargs)
             config.modalities = modalities
             return config, kwargs
 
-        config = super().from_dict(config_dict, kwargs)
+        config = super().from_dict(config_dict, **kwargs)
         config.modalities = modalities
         return config
 
@@ -250,7 +250,7 @@ class MultiModalModelForCausalLM(PreTrainedModel):
         dtype = get_torch_dtype(config.dtype)
 
         if bootstrap:
-            self.model = AutoModelForCausalLM.from_pretrained(config.llm_path, attn_implementation="flash_attention_2")
+            self.model = AutoModelForCausalLM.from_pretrained(config.llm_path, attn_implementation="flash_attention_2", low_cpu_mem_usage=True)
         else:
             llm_config = AutoConfig.from_pretrained(
                     config.llm_path,
@@ -715,5 +715,21 @@ def bootstrap(config, tokenizer, modalities_config):
     model = MultiModalModelForCausalLM(
         multimodal_config, bootstrap=True)
     return model
+
+
+try:
+    AutoConfig.register(MultimodalConfig.model_type, MultimodalConfig)
+except ValueError:
+    pass
+
+try:
+    AutoModel.register(MultimodalConfig, MultiModalModelForCausalLM)
+except ValueError:
+    pass
+
+try:
+    AutoModelForCausalLM.register(MultimodalConfig, MultiModalModelForCausalLM)
+except ValueError:
+    pass
 
 
