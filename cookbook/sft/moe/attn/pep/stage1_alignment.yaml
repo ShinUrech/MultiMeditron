@@ -1,6 +1,6 @@
 base_llm: /capstor/store/cscs/swissai/a127/meditron/hf_cache/hub/models--OpenMeditron--Meditron3-8B/snapshots/15914bcb040cd1a4f263afcd85b84f09ad2efd95
 base_model: null
-resume_from_checkpoint: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment/checkpoint-90
+resume_from_checkpoint: false
 wandb_run_id: null
 attachment_token: <|reserved_special_token_0|>
 tokenizer_type: llama
@@ -30,15 +30,16 @@ modalities:
 training_mode: ALIGNMENT
 
 datasets:
-  - packed_path: $STORAGE_ROOT/llava_pretrain_cleaned
-  - packed_path: $STORAGE_ROOT/pixmo_anything
-  - packed_path: $STORAGE_ROOT/pixmo_cap
-  - packed_path: $STORAGE_ROOT/medtrinity_conversations_1_formatted_alignment
-  #TODO: add the ophtalmology and skin datasets when Fabrice adds them 
+  - packed_path: /capstor/store/cscs/swissai/a127/meditron/multimediset/arrow/llava_pretrain_cleaned
+  - packed_path: /capstor/store/cscs/swissai/a127/meditron/multimediset/arrow/pixmo_anything
+  - packed_path: /capstor/store/cscs/swissai/a127/meditron/multimediset/arrow/pixmo_cap
+  - packed_path: /capstor/store/cscs/swissai/a127/meditron/multimediset/arrow/medtrinity_conversations_1_formatted_alignment
+  - packed_path: /capstor/store/cscs/swissai/a127/meditron/multimediset/arrow/eye_dataset_converted
+  - packed_path: /capstor/store/cscs/swissai/a127/meditron/multimediset/arrow/skin_dataset_converted
 
 training_args:
-  output_dir: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment
-  run_name:   MultiMeditron-8B-attn-pep-alignment
+  output_dir: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment-7exp
+  run_name:   MultiMeditron-8B-attn-pep-alignment-7exp
   dataloader_num_workers: 16
   dataloader_prefetch_factor: 4
   remove_unused_columns: false
