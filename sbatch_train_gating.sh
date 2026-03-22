@@ -19,7 +19,13 @@ export HF_HOME=/iopsstor/scratch/cscs/surech/hf
 export PYTHONPATH=/users/surech/meditron/MultiMeditron/src:/users/surech/meditron/MultiMeditron/third-party/lmms-eval:${PYTHONPATH:-}
 
 export WANDB_DIR=/capstor/store/cscs/swissai/a127/homes/surech/wandb
-export WANDB_MODE=offline
+export WANDB_MODE=online
+
+# Source .env for secrets (WANDB_API_KEY, etc.)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  set -a; source "$SCRIPT_DIR/.env"; set +a
+fi
 
 # NCCL / distributed settings
 export NCCL_DEBUG=INFO
@@ -58,7 +64,8 @@ CMD="$LAUNCHER /users/surech/meditron/MultiMeditron/scripts/train_gating.py \
   --output_dir $OUTPUT_DIR \
   --num_epochs 20 \
   --batch_size 64 \
-  --max_samples_per_class 10000 \
+  --max_samples_per_class 5000 \
+  --num_workers 2 \
   --wandb \
   --wandb_project multimeditron-gating"
 
