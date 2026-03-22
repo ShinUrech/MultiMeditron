@@ -18,6 +18,7 @@
 #   Debug:    sbatch --partition=debug --nodes=4 --time=00:30:00 sbatch_train.sh cookbook/sft/moe/attn/pep/stage1_alignment_debug.yaml
 
 CONFIG=${1:?"Usage: sbatch [--partition=debug --nodes=N --time=HH:MM:SS] sbatch_train.sh <config_path>"}
+CONFIG=$(realpath "$CONFIG")
 
 export WANDB_DIR=/capstor/store/cscs/swissai/a127/homes/surech/wandb
 export WANDB_MODE=offline
