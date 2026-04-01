@@ -1,9 +1,9 @@
 # MultiMeditron MoE Training Guide
 
-This is a comprehensive guide for training MultiMeditron's Mixture-of-Experts (MoE) architecture — covering gating network training, alignment, end-to-end fine-tuning, evaluation, and known pitfalls.
+This guide documents our full training pipeline for MultiMeditron's Mixture-of-Experts (MoE) architecture — covering gating network training, alignment, end-to-end fine-tuning, evaluation, and the pitfalls we ran into along the way.
 
 > **Audience**: Anyone with access to the CSCS Clariden cluster (account `a127`).
-> Written from experience adding Ophthalmology + Dermatology experts to the 5-expert baseline (March 2026).
+> Based on our experience adding Ophthalmology + Dermatology experts to the 5-expert baseline (March 2026).
 
 ---
 
@@ -21,7 +21,7 @@ This is a comprehensive guide for training MultiMeditron's Mixture-of-Experts (M
 
 ## 🏗️ Overview & Architecture
 
-MultiMeditron uses a **Mixture-of-Experts (MoE)** vision encoder. Each input image is routed by a gating network to one or more domain-specific CLIP models, whose embeddings are fused via cross-attention before being projected into the LLM's token space.
+Our architecture uses a **Mixture-of-Experts (MoE)** vision encoder. Each input image is routed by a gating network to one or more domain-specific CLIP models, whose embeddings are fused via cross-attention before being projected into the LLM's token space.
 
 ```
 Input image (224×224)
@@ -46,7 +46,7 @@ Input image (224×224)
   LLaMA 3.1 8B (Meditron3)
 ```
 
-**The training pipeline has three phases** (assuming CLIP experts already exist):
+**Our training pipeline has three phases** (assuming CLIP experts already exist):
 1. Train/retrain the gating network to route images to the correct expert(s)
 2. Stage 1 alignment training (frozen LLM, train projector + cross-attention)
 3. Stage 2 end-to-end training (unfrozen LLM, all parameters)
@@ -55,11 +55,11 @@ Input image (224×224)
 
 ## 🧭 Step 1 — Train the Gating Network
 
-The gating network is a **ResNet50 classification backbone** with a replaced FC head. It routes each input image to the most relevant expert(s).
+The gating network is a **ResNet50 classification backbone** with a replaced FC head that routes each input image to the most relevant expert(s). We retrain it every time we add or remove an expert.
 
 ### 📐 Architecture
 
-The gating network is a **ResNet50 classification backbone** with a replaced fully-connected head:
+We use a ResNet50 with a replaced fully-connected head:
 
 ```
 Input image (224×224)
@@ -76,13 +76,13 @@ Input image (224×224)
 - **`top_k`**: how many experts to activate per image (typically 1 for routing accuracy, 3 for richer fusion)
 - Weights are softmax-normalized over all classes — the full softmax vector is used as fusion weights in cross-attention fusion (`cross_attn` mode), regardless of `top_k`
 
-The model is stored as a HuggingFace `PreTrainedModel` via `GatingNetwork` / `GatingNetworkConfig`.
+We store the model as a HuggingFace `PreTrainedModel` via `GatingNetwork` / `GatingNetworkConfig`.
 
 ---
 
 ### 🗂️ Dataset Preparation
 
-The training script expects an **ImageFolder** layout — one subdirectory per expert class:
+Our training script expects an **ImageFolder** layout — one subdirectory per expert class:
 
 ```
 data/
@@ -111,15 +111,13 @@ data/
 | Ophthalmology | `eye_dataset_converted` | 32K |
 | Skin | `skin_dataset_converted` | 63K |
 
-> **Tip:** Use `--max_samples_per_class` to cap each class and avoid imbalance. 10,000 per class is a good starting point.
+> **Tip:** We use `--max_samples_per_class` to cap each class and avoid imbalance. 10,000 per class is a good starting point.
 
 ---
 
 ### 🏋️ Training
 
-### Training
-
-Train a ResNet50 classification head on top of frozen ImageNet weights using `scripts/image_router_train.py`:
+We train a ResNet50 classification head on top of frozen ImageNet weights using `scripts/image_router_train.py`:
 
 ```bash
 cd /users/surech/meditron/MultiMeditron
@@ -148,13 +146,11 @@ python3 scripts/image_router_train.py \
 
 The backbone is frozen by default — only the final FC layers are trained. Early stopping triggers when accuracy plateaus above 90% and loss stops decreasing.
 
-> **Important**: You must retrain the gating network every time you add or remove an expert, since the number of output classes changes.
-
 ---
 
 ### 💾 Converting to HuggingFace Format
 
-After training, convert the raw `.pth` weights into the HuggingFace `GatingNetwork` format so it can be consumed by MoE training configs:
+After training, we convert the raw `.pth` weights into the HuggingFace `GatingNetwork` format so it can be consumed by our MoE training configs:
 
 ```python
 from multimeditron.model.modalities.moe.gating import GatingNetwork, GatingNetworkConfig
@@ -170,13 +166,13 @@ model = GatingNetwork(config, resnet_path="output/gating/model_<timestamp>.pth")
 model.save_pretrained("models/CLIP/MultiMeditron-Gating-7exp")
 ```
 
-> The saved directory will contain `config.json` and `model.safetensors`, ready for use as `gating_path` in any MoE YAML config.
+> The saved directory will contain `config.json` and `model.safetensors`, ready for use as `gating_path` in our MoE YAML configs.
 
 ---
 
 ### 🔗 Integrating into MoE Training Configs
 
-Point `gating_path` in your alignment or end-to-end YAML to the trained checkpoint:
+We point `gating_path` in the alignment or end-to-end YAML to the trained checkpoint:
 
 ```yaml
 modalities:
@@ -203,7 +199,7 @@ modalities:
 
 ### 🖥️ Running on CSCS (Clariden)
 
-The training script is lightweight (~1 GPU, 30 min for 20 epochs at 10K samples/class). Run it interactively in a debug job:
+The training script is lightweight (~1 GPU, 30 min for 20 epochs at 10K samples/class). We typically run it interactively in a debug job:
 
 ```bash
 srun --time=00:29:59 --partition=debug -A a127 \
@@ -226,7 +222,7 @@ python3 scripts/image_router_train.py \
 
 ### 📊 Expected Results
 
-On the 7-class setup, a well-trained gating network should achieve:
+On our 7-class setup, we observed the following:
 
 | Metric | Target |
 |--------|--------|
@@ -234,13 +230,13 @@ On the 7-class setup, a well-trained gating network should achieve:
 | Epochs to convergence | 5–15 (with early stopping) |
 | Training time (1 GPU, 70K images) | ~15–30 min |
 
-Routing accuracy directly impacts MoE quality. If gating is poor (< 80%), experts receive off-modality images and the MoE model will underperform a single-expert baseline.
+Routing accuracy directly impacts MoE quality. We found that if gating is poor (< 80%), experts receive off-modality images and the model underperforms a single-expert baseline.
 
 ---
 
 ### 🔍 Debugging Routing Quality
 
-To inspect which expert a set of images is routed to:
+We use the following snippet to inspect which expert a set of images is routed to:
 
 ```python
 from multimeditron.model.modalities.moe.gating import GatingNetwork
@@ -266,7 +262,7 @@ print("Expert weights: ", {CLASS_NAMES[i]: f"{w:.3f}" for i, w in enumerate(weig
 
 ## 🎯 Step 2 — Stage 1: Alignment Training
 
-Stage 1 trains the vision-to-LLM projector while keeping the LLM backbone **frozen**. This teaches the model how to interpret the new expert embeddings without forgetting language capabilities.
+Stage 1 trains the vision-to-LLM projector while keeping the LLM backbone **frozen**. This teaches the model to interpret the new expert embeddings without forgetting language capabilities.
 
 ### Config: `cookbook/sft/moe/attn/pep/stage1_alignment.yaml`
 
@@ -301,7 +297,7 @@ datasets:                                              # Alignment datasets (cap
   - packed_path: .../skin_dataset_converted            # ← New modality data
 
 training_args:
-  output_dir: /iopsstor/.../freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment-7exp
+  output_dir: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment-7exp
   learning_rate: 1.0e-5
   per_device_train_batch_size: 8
   gradient_accumulation_steps: 4                       # Effective batch = 8 × 4 × num_gpus
@@ -325,7 +321,7 @@ sbatch --nodes=8 --time=11:59:59 sbatch_train.sh \
   cookbook/sft/moe/attn/pep/stage1_alignment.yaml
 ```
 
-For the 7-expert setup with 8 nodes (32 GPUs), Stage 1 takes ~4–6 hours for 3 epochs (~2,139 steps). Output: `checkpoint-2139`.
+For our 7-expert setup with 8 nodes (32 GPUs), Stage 1 took ~4–6 hours for 3 epochs (~2,139 steps). Output: `checkpoint-2139`.
 
 ### What to look for
 
@@ -339,14 +335,14 @@ For the 7-expert setup with 8 nodes (32 GPUs), Stage 1 takes ~4–6 hours for 3 
 
 ## 🔥 Step 3 — Stage 2: End-to-End Fine-Tuning
 
-Stage 2 unfreezes the entire model (LLM + projector + cross-attention) for full supervised fine-tuning on medical VQA and conversation data.
+Stage 2 unfreezes the entire model (LLM + projector + cross-attention) for full supervised fine-tuning on medical VQA and conversation data. This is the most compute-intensive phase.
 
 ### Config: `cookbook/sft/moe/attn/pep/stage2_end2end.yaml`
 
 Key differences from Stage 1:
 
 ```yaml
-base_model: /iopsstor/.../freeze/attn_pep/.../checkpoint-2139   # ← Stage 1 output
+base_model: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/freeze/attn_pep/MultiMeditron-8B-attn-pep-alignment-7exp/checkpoint-2139   # ← Stage 1 output
 training_mode: END2END                                           # Unfreezes everything
 
 modalities:
@@ -366,7 +362,7 @@ datasets:                     # Richer instruction-tuning data (more datasets, l
   - packed_path: .../skin_dataset_converted             # ← New modality data
 
 training_args:
-  output_dir: /iopsstor/.../unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end-7exp
+  output_dir: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end-7exp
   learning_rate: 1.0e-5
   per_device_train_batch_size: 8
   gradient_accumulation_steps: 2                        # Smaller accumulation → more frequent updates
@@ -381,7 +377,7 @@ training_args:
 
 ### Launch
 
-Stage 2 requires more compute. For 128 nodes (512 GPUs):
+Stage 2 requires significantly more compute. We ran it on 128 nodes (512 GPUs):
 
 ```bash
 export HF_TOKEN=<your-token>
@@ -395,17 +391,17 @@ sbatch --nodes=128 --time=11:59:59 sbatch_train.sh \
 | 64 nodes (256 GPUs) | 8 × 2 × 256 = 4,096 | ~3,000 | ~30 s | ~25h |
 | 128 nodes (512 GPUs) | 8 × 2 × 512 = 8,192 | ~1,544 | ~53 s | ~23h |
 
-> At 128 nodes, the job will **not** complete in 12h. You need to split it across two runs using `resume_from_checkpoint`.
+> At 128 nodes, the job will **not** complete in 12h. We had to split it across two runs using `resume_from_checkpoint`.
 
 ### Resuming from a checkpoint
 
 Set `resume_from_checkpoint` in the YAML:
 
 ```yaml
-resume_from_checkpoint: /iopsstor/.../checkpoint-800
+resume_from_checkpoint: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end-7exp/checkpoint-800
 ```
 
-**Critical**: The resume must use the **same number of nodes/GPUs** as the original run. ZeRO-3 shards are tied to the rank count — mismatched ranks will crash with a `ShardedTensor` error.
+**Critical**: The resume must use the **same number of nodes/GPUs** as the original run. ZeRO-3 shards are tied to the rank count — we hit a `ShardedTensor` error when we tried changing the node count mid-run.
 
 ### What to look for
 
@@ -419,7 +415,7 @@ resume_from_checkpoint: /iopsstor/.../checkpoint-800
 
 ## 📊 Step 4 — Evaluation
 
-Evaluate checkpoints using `lmms-eval` with a vLLM backend. The eval script `sbatch_eval_vllm.sh` handles all setup.
+We evaluate checkpoints using `lmms-eval` with the accelerate-based multi-node launcher. Our eval script `sbatch_eval.sh` handles all setup.
 
 ### Supported benchmarks
 
@@ -435,40 +431,41 @@ Evaluate checkpoints using `lmms-eval` with a vLLM backend. The eval script `sba
 export HF_TOKEN=<your-token>
 
 # Quick test (debug partition, 30 min, first 20 samples)
-sbatch --partition=debug --time=00:29:59 \
-  sbatch_eval_vllm.sh \
-  /iopsstor/.../checkpoint-800 \
+sbatch --partition=debug --nodes=2 --time=00:29:59 \
+  sbatch_eval.sh \
+  /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end-7exp/checkpoint-800 \
+  llama \
   gmai,slake,path_vqa \
   20
 
-# Full eval (normal partition, 1 hour)
-sbatch --time=01:00:00 \
-  sbatch_eval_vllm.sh \
-  /iopsstor/.../checkpoint-800 \
+# Full eval (normal partition, 16 nodes, ~50 min)
+sbatch --time=03:00:00 --nodes=16 \
+  sbatch_eval.sh \
+  /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end-7exp/checkpoint-800 \
+  llama \
   gmai,slake,path_vqa
 ```
 
 ### Arguments
 
 ```
-sbatch sbatch_eval_vllm.sh <checkpoint> [tasks] [limit] [tp_size] [dp_size]
+sbatch [--nodes N] [--time HH:MM:SS] sbatch_eval.sh <checkpoint> [tokenizer] [tasks] [limit]
 ```
 
 | Arg | Default | Description |
 |-----|---------|-------------|
 | `checkpoint` | required | Path to model checkpoint |
+| `tokenizer` | `llama` | Tokenizer type |
 | `tasks` | `gmai,slake,path_vqa` | Comma-separated task list |
 | `limit` | all | Max samples per task (for quick tests) |
-| `tp_size` | 4 | Tensor parallelism (use 4 for 1 node) |
-| `dp_size` | 1 | Data parallelism |
 
 ### Output
 
-Results go to `/users/surech/meditron/reports/lm_eval_results/<checkpoint_name>/`. Each task produces a JSON with per-metric scores. Logs go to `/users/surech/meditron/reports/R-multimeditron-eval-vllm.<jobid>.{out,err}`.
+Results go to `/users/surech/meditron/reports/lmms_eval_results/<checkpoint_name>/`. Each task produces a JSON with per-metric scores. Logs go to `/users/surech/meditron/reports/R-multimeditron-eval.<jobid>.{out,err}`.
 
 ### Custom tasks
 
-Task definitions live in `third-party/lmms-eval/lmms_eval/tasks/`. To add a new benchmark, create a YAML task file following the lmms-eval convention.
+Our task definitions live in `third-party/lmms-eval/lmms_eval/tasks/`. To add a new benchmark, create a YAML task file following the lmms-eval convention.
 
 ---
 
@@ -493,8 +490,7 @@ Task definitions live in `third-party/lmms-eval/lmms_eval/tasks/`. To add a new 
 
 | EDF | Purpose |
 |-----|---------|
-| `~/.edf/multimeditron.toml` | Training (DeepSpeed, torchrun) |
-| `~/.edf/vllm.toml` | Evaluation (vLLM + lmms-eval) |
+| `~/.edf/multimeditron.toml` | Training and evaluation |
 
 ### Partition limits
 
@@ -529,7 +525,7 @@ tail -f /users/surech/meditron/reports/gpu-util-<jobid>/node-0.log
 
 ### WandB sync (offline → cloud)
 
-Compute nodes run WandB in offline mode. To sync runs to the cloud, submit a container debug job:
+Compute nodes run WandB in offline mode. To sync runs to the cloud, we submit a container debug job:
 
 ```bash
 sbatch --partition=debug --time=00:10:00 --nodes=1 -A a127 \
@@ -544,11 +540,13 @@ sbatch --partition=debug --time=00:10:00 --nodes=1 -A a127 \
 
 ## 🚧 Troubleshooting & Roadblocks
 
+These are issues we encountered during development. Documenting them here to save others the debugging time.
+
 ### ZeRO-3 checkpoint resume: `ShardedTensor` mismatch
 
 **Symptom**: Crash on resume with `RuntimeError: The checkpoint was created with X processes but attempted to load with Y`.
 
-**Cause**: ZeRO-3 shards model state across all ranks. Resuming with a different number of GPUs fails.
+**Cause**: ZeRO-3 shards model state across all ranks. We hit this when trying to resume a 128-node run with a different node count.
 
 **Fix**: Always resume with the exact same `--nodes` value and GPU count as the original training run. If you must change scale, convert the checkpoint to a full (non-sharded) model first using DeepSpeed's `zero_to_fp32.py`.
 
@@ -558,9 +556,9 @@ sbatch --partition=debug --time=00:10:00 --nodes=1 -A a127 \
 
 **Symptom**: `OutOfMemoryError: CUDA out of memory` when using `"stage": 2` in the DeepSpeed config.
 
-**Cause**: ZeRO-2 keeps full model parameters and gradients on each GPU. With 7 CLIP experts + LLaMA-8B + cross-attention layers + activations, this exceeds 96 GB per GH200 GPU.
+**Cause**: ZeRO-2 keeps full model parameters and gradients on each GPU. With our 7 CLIP experts + LLaMA-8B + cross-attention layers + activations, this exceeds 96 GB per GH200 GPU.
 
-**Fix**: Use ZeRO-3 (`config/deepspeed_fast.json`). ZeRO-3 partitions parameters across all ranks, fitting within 96 GB. The tradeoff is ~53 s/step at 128 nodes due to all-gather communication overhead.
+**Fix**: We use ZeRO-3 (`config/deepspeed_fast.json`). ZeRO-3 partitions parameters across all ranks, fitting within 96 GB. The tradeoff is ~53 s/step at 128 nodes due to all-gather communication overhead.
 
 ---
 
@@ -568,9 +566,9 @@ sbatch --partition=debug --time=00:10:00 --nodes=1 -A a127 \
 
 **Symptom**: Training speed degrades over time, GPUs show low utilization, data loading becomes the bottleneck. Potentially `OSError: [Errno 28] No space left on device` if `/tmp` fills up.
 
-**Cause**: Arrow datasets are on shared Lustre (`/capstor/`). High `num_workers` (e.g. 16) across 512 ranks = 8,192 concurrent readers → swamps the parallel filesystem.
+**Cause**: Our Arrow datasets are on shared Lustre (`/capstor/`). High `num_workers` (e.g. 16) across 512 ranks = 8,192 concurrent readers → swamps the parallel filesystem.
 
-**Fix**: Set `dataloader_num_workers: 2` and `dataloader_prefetch_factor: 2` in Stage 2 configs. Stage 1 with fewer nodes (8) can tolerate higher values.
+**Fix**: We set `dataloader_num_workers: 2` and `dataloader_prefetch_factor: 2` in Stage 2 configs. Stage 1 with fewer nodes (8) can tolerate higher values.
 
 ---
 
@@ -580,7 +578,7 @@ sbatch --partition=debug --time=00:10:00 --nodes=1 -A a127 \
 
 **Cause**: Hardware faults are routine on large-scale HPC runs (128 nodes = 512 GPUs). A single GPU memory error kills the entire job.
 
-**Fix**: Save checkpoints frequently (`save_steps: 50` in Stage 2) and resume. There is no automatic fault tolerance with DeepSpeed + torchrun.
+**Fix**: We save checkpoints frequently (`save_steps: 50` in Stage 2) and resume. There is no automatic fault tolerance with DeepSpeed + torchrun.
 
 ---
 
@@ -590,31 +588,17 @@ sbatch --partition=debug --time=00:10:00 --nodes=1 -A a127 \
 
 **Cause**: At 128 nodes / ZeRO-3, Stage 2 takes ~23h for 1 epoch (~1,544 steps at 53 s/step). The normal partition limit is 12h.
 
-**Fix**: Split training across two jobs using `resume_from_checkpoint`. Set `save_steps: 50` so you have a recent checkpoint. First job runs steps 0–800, second job resumes from `checkpoint-800` and completes the remaining ~744 steps.
+**Fix**: We split training across two jobs using `resume_from_checkpoint`. With `save_steps: 50`, we always have a recent checkpoint. Our first job ran steps 0–800, and the second resumed from `checkpoint-800` to complete the remaining ~744 steps.
 
 ---
 
 ### `ModuleNotFoundError: No module named 'decord'` in eval
 
-**Symptom**: lmms-eval crashes at import time when running with the vLLM container.
+**Symptom**: lmms-eval crashes at import time during eval.
 
-**Cause**: `third-party/lmms-eval/lmms_eval/models/simple/vllm.py` had a top-level `from decord import VideoReader, cpu`. The `decord` package has no pip wheel for the ARM64 vLLM container.
+**Cause**: Some lmms-eval files had a top-level `from decord import VideoReader, cpu`. The `decord` package is not available in our environment.
 
-**Fix**: Already applied — the import is wrapped in a lazy `try/except`. If you see this error, ensure you're using the latest code from the `add-ophthalmology-and-dermatology-experts` branch.
-
----
-
-### Broken pip cache in eval container
-
-**Symptom**: Eval job fails with `ERROR: Could not find a version that satisfies the requirement ...`.
-
-**Cause**: A prior failed `pip install` left partial files in `/iopsstor/scratch/cscs/surech/pip-lm-eval-nodeps`.
-
-**Fix**:
-```bash
-rm -rf /iopsstor/scratch/cscs/surech/pip-lm-eval-nodeps
-```
-Then resubmit the eval job. The script will recreate the directory cleanly.
+**Fix**: Already applied — we wrapped all `decord` imports in lazy `try/except` blocks in `lmms_eval/models/simple/vllm.py`, `lmms_eval/protocol.py`, and `lmms_eval/models/model_utils/load_video.py`. Make sure you're using the latest code from the `add-ophthalmology-and-dermatology-experts` branch.
 
 ---
 
@@ -634,7 +618,7 @@ Then resubmit the eval job. The script will recreate the directory cleanly.
 
 **Cause**: Default NCCL GDR (GPU Direct RDMA) settings don't work correctly on GH200 interconnect.
 
-**Fix**: Ensure `NCCL_NET_GDR_LEVEL=0` is set. The `sbatch_train.sh` script exports this. If using a custom launch script, add:
+**Fix**: Ensure `NCCL_NET_GDR_LEVEL=0` is set. Our `sbatch_train.sh` script exports this. If using a custom launch script, add:
 ```bash
 export NCCL_NET_GDR_LEVEL=0
 ```

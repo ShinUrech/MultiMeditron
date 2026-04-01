@@ -60,6 +60,63 @@ Each MoE configuration contains both alignment and end-to-end training stages.
 | MultiMeditron LLaMA3.1-8B AVG-SHARED        | 29.7 | 46.8        | 2.6              | 24.2            | 49.5      | 23.7          | 25.8          |
 | Random                                      | 25.7 | 50.0        | –                | –               | 50.0      | –             | –             |
 
+> **Note:** The cookbook numbers above were produced from the **final checkpoint** of each model's Stage 2 training run (see path registry below).
+
+## 📍 Model Path Registry (CSCS Capstor)
+
+All published model checkpoints live on **capstor** at:
+```
+/capstor/store/cscs/swissai/a127/homes/meditron/models/multimeditron/
+```
+
+### End-to-end trained models (`unfreeze/`)
+
+| Cookbook Name | Capstor Path (relative to root) | Final Ckpt | Last Trained | Author |
+|---|---|---|---|---|
+| ATTN-PEP (5-expert) | `unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end/` | **3063** | 2026-01-01 | mzhang |
+| ATTN-SHARED | `unfreeze/attn_shared/MultiMeditron-8B-attn-shared-end2end/` | **1532** | 2025-12-22 | theoschiff |
+| AVG-PEP | `unfreeze/avg_pep/MultiMeditron-8B-avg-pep-end2end/` | **1532** | 2025-12-22 | theoschiff |
+| AVG-SHARED | `unfreeze/avg_shared/MultiMeditron-8B-avg-shared-end2end/` | **1532** | 2025-12-22 | theoschiff |
+| CAT-PEP | `unfreeze/cat_pep/MultiMeditron-8B-cat-pep-end2end/` | **1532** | 2026-01-07 | theoschiff |
+| CAT-SHARED | `unfreeze/cat_shared/MultiMeditron-8B-cat-shared-end2end/` | **1532** | 2026-01-07 | theoschiff |
+| Qwen3-4B BiomedCLIP | `unfreeze/single_clip/MultiMeditron-Qwen-4B-End2End-BiomedCLIP/` | **3063** | 2026-01-27 | mzhang |
+| Apertus-8B BiomedCLIP | `unfreeze/single_clip/MultiMeditron-Apertus-8B-End2End-BiomedCLIP/` | **3063** | 2025-12-30 | mzhang |
+| LLaMA3.1-8B BiomedCLIP | `unfreeze/single_clip/MultiMeditron-Llama-8B-End2End-BiomedCLIP/` | **3063** | 2026-01-03 | mzhang |
+| LLaMA3.1-8B CLIP | `unfreeze/single_clip/MultiMeditron-Llama-8B-End2End-CLIP/` | **3063** | 2026-01-26 | mzhang |
+
+> `unfreeze/avg_pep/MultiMeditron-8B-avg-pep-full/` exists but is empty.
+>
+> None of these models have been published to HuggingFace Hub yet. The HF dataset is at [OpenMeditron/MultiMediset](https://huggingface.co/datasets/OpenMeditron/MultiMediset).
+
+### 7-expert ATTN-PEP (in-progress, iopsstor)
+
+| Model | Path | Latest Ckpt | Last Trained | Author |
+|---|---|---|---|---|
+| ATTN-PEP 7-expert | `/iopsstor/scratch/cscs/surech/multimeditron/checkpoints/unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end-7exp/` | **800** | 2026-03-24 | surech |
+
+### Alignment models (`freeze/`)
+
+Alignment-stage (Stage 1) checkpoints are stored under `freeze/` with the same variant naming:
+`attn_pep`, `attn_shared`, `avg_pep`, `avg_shared`, `cat_pep`, `cat_shared`, `single_clip`,
+plus MoE-specific variants: `moe_avg_pep`, `moe_avg_shared`, `moe_cat_pep`, `moe_cat_shared`.
+
+For the full dataset and model reference (including paths, descriptions, and data formats), see [cookbook/REGISTRY.md](REGISTRY.md).
+
+## 📈 7-Expert vs 5-Expert Comparison
+
+Comparison of the new 7-expert ATTN-PEP model (checkpoint-800) against the published 5-expert cookbook baseline:
+
+| Benchmark | 5-expert ATTN-PEP (cookbook) | 7-expert checkpoint-800 | Δ |
+|---|---|---|---|
+| **GMAI** | 29.6% | 31.1% | **+1.5** |
+| **SLAKE overall** | 29.6% | 30.6% | **+1.0** |
+| SLAKE yes/no | 51.1% | 51.1% | 0.0 |
+| **PathVQA overall** | 30.3% | 24.4% | **−5.9** |
+| PathVQA yes/no | 59.1% | 47.1% | **−12.0** |
+| GMAI Dermatology | – | 39.5% | *new* |
+| GMAI Ophthalmology | – | 31.8% | *new* |
+
+> **Key finding:** GMAI and SLAKE improved, but PathVQA (especially binary yes/no) regressed significantly. The PathVQA regression likely stems from the expanded 7-expert routing affecting binary classification confidence. Worth investigating gating weights on PathVQA samples.
 
 ## 🚀 Usage
 
