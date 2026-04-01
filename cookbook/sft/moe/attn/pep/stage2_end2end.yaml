@@ -46,8 +46,8 @@ datasets:
 training_args:
   output_dir: /iopsstor/scratch/cscs/surech/multimeditron/checkpoints/unfreeze/attn_pep/MultiMeditron-8B-attn-pep-end2end-7exp
   run_name: MultiMeditron-8B-attn-pep-end2end-7exp
-  dataloader_num_workers: 16
-  dataloader_prefetch_factor: 4
+  dataloader_num_workers: 2
+  dataloader_prefetch_factor: 2
   remove_unused_columns: false
   ddp_find_unused_parameters: false
   learning_rate: 1.0e-5
@@ -59,7 +59,7 @@ training_args:
   gradient_checkpointing_kwargs:
     use_reentrant: true
   save_strategy: steps
-  save_steps: 200
+  save_steps: 50
   save_total_limit: 5
   max_grad_norm: 1.0
   deepspeed: /users/surech/meditron/MultiMeditron/config/deepspeed_fast.json

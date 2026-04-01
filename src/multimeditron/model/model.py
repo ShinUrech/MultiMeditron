@@ -32,6 +32,17 @@ class ChatTemplate:
 
     @staticmethod
     def from_name(name: str) -> ChatTemplate:
+        """Create a ChatTemplate instance by name.
+
+        Args:
+            name (str): Template name, one of 'llama', 'apertus', or 'qwen3'.
+
+        Returns:
+            ChatTemplate: The corresponding chat template.
+
+        Raises:
+            ValueError: If the name is not a recognized template.
+        """
         templates = {
             "llama": ChatTemplate.llama,
             "apertus": ChatTemplate.apertus,
@@ -46,6 +57,7 @@ class ChatTemplate:
     # -------------------------------
     @staticmethod
     def llama() -> ChatTemplate:
+        """Return a ChatTemplate configured for the LLaMA / Mistral header-id format."""
         delimiters = {
             "system": {"start": "<|start_header_id|>system<|end_header_id|>", "end": "<|eot_id|>"},
             "user": {"start": "<|start_header_id|>user<|end_header_id|>", "end": "<|eot_id|>"},
@@ -64,6 +76,7 @@ class ChatTemplate:
     # -------------------------------
     @staticmethod
     def apertus() -> ChatTemplate:
+        """Return a ChatTemplate configured for the Apertus start/end format."""
         delimiters = {
             "system": {"start": "<|system_start|>", "end": "<|system_end|>"},
             "developer": {"start": "<|developer_start|>", "end": "<|developer_end|>"},
@@ -83,6 +96,7 @@ class ChatTemplate:
     # -------------------------------
     @staticmethod
     def qwen3() -> ChatTemplate:
+        """Return a ChatTemplate configured for the Qwen-3 / ChatML im_start/im_end format."""
         delimiters = {
             "system": {"start": "<|im_start|>system", "end": "<|im_end|>"},
             "user": {"start": "<|im_start|>user", "end": "<|im_end|>"},
@@ -383,6 +397,18 @@ class MultiModalModelForCausalLM(PreTrainedModel):
         return self.model
 
     def _get_modality_by_name(self, name: str) -> BaseModality:
+        """Look up a registered modality by its type name.
+
+        Args:
+            name (str): The modality type identifier (e.g. 'image').
+
+        Returns:
+            BaseModality: The registered modality instance.
+
+        Raises:
+            KeyError: If no modality with the given name is registered.
+            TypeError: If the registered object is not a BaseModality subclass.
+        """
         if name not in self.modalities_by_type:
             raise KeyError(
                 f"No modality registered in the model that can handle modality named: {name}"

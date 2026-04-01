@@ -28,14 +28,21 @@ logger = logging.getLogger(__name__)
 PngImagePlugin.MAX_TEXT_CHUNK = 2 ** 30
 
 def is_dataset_folder(folder: str) -> bool:
+    """Check if a folder is a valid HuggingFace dataset saved with ``save_to_disk``."""
     return os.path.exists(os.path.join(folder, datasets_config.DATASET_INFO_FILENAME)) and \
         os.path.exists(os.path.join(folder, datasets_config.DATASET_STATE_JSON_FILENAME))
 
 def is_jsonl(path: str) -> bool:
+    """Return True if the file path has a ``.jsonl`` extension."""
     filename, extension = os.path.splitext(path)
     return extension == ".jsonl"
 
 def is_main_process() -> bool:
+    """Check if the current process is the main (rank-0) process.
+
+    Handles cases where ``torch.distributed`` is not available or not
+    yet initialized, returning True in both cases.
+    """
     # safe main-process check for DDP/torchrun
     if not torch.distributed.is_available():
         return True
@@ -44,6 +51,18 @@ def is_main_process() -> bool:
     return torch.distributed.get_rank() == 0
 
 def build_datasets(config):
+    """Load, concatenate, and shuffle all datasets specified in the config.
+
+    Automatically determines the optimal number of preprocessing workers
+    based on visible CPUs and GPUs per node.
+
+    Args:
+        config (dict): Training configuration with a ``datasets`` key containing
+            a list of dataset entries, each with a ``packed_path``.
+
+    Returns:
+        Dataset: A single concatenated and shuffled HuggingFace dataset.
+    """
     packed_datasets = []
 
     # use env vars set by torchrun

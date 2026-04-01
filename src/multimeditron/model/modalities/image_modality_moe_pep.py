@@ -9,6 +9,8 @@ from typing import Dict, Any, List
 
 
 class MOEImageConfigPEP(BaseModalityConfig):
+    """Configuration for the Mixture-of-Experts image modality with per-expert projection (PEP)."""
+
     def __init__(
         self,
         hidden_size: int = 4096,
@@ -59,6 +61,12 @@ class MOEImageProcessorPEP(BaseModalityProcessor):
     Uses a pretrained image processor to convert raw images into pixel values.
     """
     def __init__(self, config: MOEImageConfigPEP):
+        """Initialize the PEP MoE image processor with a pretrained image preprocessor.
+
+        Args:
+            config (MOEImageConfigPEP): Configuration specifying the image processor
+                model, top-k experts, and fusion method.
+        """
         super().__init__(config)
         self.image_processor = AutoImageProcessor.from_pretrained(config.image_processor)
 
@@ -70,6 +78,19 @@ class MOEImageProcessorPEP(BaseModalityProcessor):
 
 
     def process(self, modality: Dict[str, Any]):
+        """Preprocess a raw image into pixel values and compute the expected embedding count.
+
+        Args:
+            modality (Dict[str, Any]): Modality dict containing the raw image
+                under the MODALITY_VALUE_KEY.
+
+        Returns:
+            Dict[str, Any]: Updated modality dict with processed pixel values
+                and NUM_EMBEDDINGS_KEY set according to the fusion method.
+
+        Raises:
+            ValueError: If the configured fusion_method is not supported.
+        """
         processed_modality = modality.copy()
 
         image = modality[MODALITY_VALUE_KEY]
@@ -102,6 +123,16 @@ class MOEImageModalityPEP(BaseModality):
     preprocessor_class = MOEImageProcessorPEP
 
     def __init__(self, config: MOEImageConfigPEP):
+        """Initialize the PEP MoE image modality with per-expert CLIP models, projectors, and gating.
+
+        Each expert CLIP model gets its own MLP projector so that heterogeneous
+        embedding dimensions are supported.  A gating network (if provided)
+        routes images to the appropriate experts.
+
+        Args:
+            config (MOEImageConfigPEP): Configuration specifying expert model names,
+                gating path, fusion method, and projection settings.
+        """
         super().__init__(config)
 
         self.experts = torch.nn.ModuleList()
@@ -192,6 +223,19 @@ class MOEImageModalityPEP(BaseModality):
 
 
     def forward(self, inputs) -> torch.Tensor:
+        """Run all CLIP experts with per-expert projection, fuse via gating, and return embeddings.
+
+        Args:
+            inputs (List[torch.Tensor]): List of preprocessed image tensors.
+
+        Returns:
+            torch.Tensor: Fused and projected embeddings whose shape depends on
+                the fusion method (weighted_average/cross_attn → (B, P, H),
+                sequence_append → (B, E*P, H)).
+
+        Raises:
+            ValueError: If the configured fusion_method is not supported.
+        """
         inputs = torch.stack(inputs, dim=0).to(self.device)  # (B, C, H, W)
 
         # Use uniform weights when no gating network is configured
@@ -267,6 +311,14 @@ class MOEImageModalityPEP(BaseModality):
         return self._embedding_size  # post-projection dim 
 
     def train(self, mode: bool = True):
+        """Set training mode, keeping the gating network in eval mode when the modality is frozen.
+
+        Args:
+            mode (bool): Whether to set training mode. Defaults to True.
+
+        Returns:
+            MOEImageModalityPEP: Self.
+        """
         super().train(mode)
 
         if self.modality_frozen and self.gating_network is not None:
@@ -275,6 +327,7 @@ class MOEImageModalityPEP(BaseModality):
         return self
 
     def freeze_modality_embedder(self):
+        """Freeze all expert CLIP models and the gating network (if present), setting gating to eval mode."""
         if self.gating_network is not None:
             for params in self.gating_network.parameters():
                 params.requires_grad = False
@@ -287,6 +340,7 @@ class MOEImageModalityPEP(BaseModality):
         self.modality_frozen = True
         
     def unfreeze_modality_embedder(self):
+        """Unfreeze all expert CLIP models and the gating network (if present), setting gating to train mode."""
         if self.gating_network is not None:
             for params in self.gating_network.parameters():
                 params.requires_grad = True
