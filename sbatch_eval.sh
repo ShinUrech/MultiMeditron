@@ -10,16 +10,18 @@
 #SBATCH -A a127
 
 # Usage:
-#   sbatch sbatch_eval.sh <checkpoint> [tokenizer] [tasks] [limit]
+#   sbatch sbatch_eval.sh <checkpoint> [tokenizer] [tasks] [limit] [log_samples]
 #
 # Examples:
 #   Full eval:   sbatch sbatch_eval.sh /path/to/checkpoint llama gmai,slake,path_vqa
 #   Quick test:  sbatch --partition=debug --nodes=2 --time=00:29:59 sbatch_eval.sh /path/to/checkpoint llama gmai 20
+#   With sample logging: sbatch sbatch_eval.sh /path/to/checkpoint llama path_vqa "" true
 
-CHECKPOINT=${1:?"Usage: sbatch sbatch_eval.sh <checkpoint_path> [tokenizer] [tasks] [limit]"}
+CHECKPOINT=${1:?"Usage: sbatch sbatch_eval.sh <checkpoint_path> [tokenizer] [tasks] [limit] [log_samples]"}
 TOKENIZER=${2:-llama}
 TASKS=${3:-gmai,slake,path_vqa}
 LIMIT=${4:-}
+LOG_SAMPLES=${5:-}
 
 export HF_HOME=/iopsstor/scratch/cscs/surech/hf
 export HF_TOKEN=${HF_TOKEN:?"HF_TOKEN is not set"}
@@ -41,6 +43,9 @@ set -x
 
 LIMIT_ARG=""
 [ -n "$LIMIT" ] && LIMIT_ARG="--limit $LIMIT"
+
+LOG_SAMPLES_ARG=""
+[ -n "$LOG_SAMPLES" ] && LOG_SAMPLES_ARG="--log_samples --log_samples_suffix model_outputs"
 
 srun \
   --nodes "$SLURM_NNODES" \
@@ -65,5 +70,6 @@ srun \
       --batch_size 1 \
       --include_path /users/surech/meditron/MultiMeditron/third-party/lmms-eval/lmms_eval/tasks \
       --output_path /users/surech/meditron/reports/lmms_eval_results \
-      $LIMIT_ARG
+      $LIMIT_ARG \
+      $LOG_SAMPLES_ARG
   "

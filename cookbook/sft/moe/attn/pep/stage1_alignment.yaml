@@ -18,7 +18,8 @@ modalities:
       - ClosedMeditron/MedExpert-CT
       - ClosedMeditron/MedExpert-MRI
       - ClosedMeditron/MedExpert-Ultrasound
-      - ClosedMeditron/MedExpert-Xray
+      -
+       ClosedMeditron/MedExpert-Xray
       - ClosedMeditron/clip-vit-base-patch32 
       - /capstor/store/cscs/swissai/a127/meditron/models/CLIP/OphthalmologyExpert # Path to Ophtho
       - /capstor/store/cscs/swissai/a127/meditron/models/CLIP/SkinExpert # Path to Skin
