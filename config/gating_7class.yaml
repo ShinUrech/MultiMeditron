@@ -77,6 +77,9 @@ weight_decay: 1e-4
 batch_size: 64
 num_workers: 4
 val_split: 0.1
+# Hold out a separate test split that is never seen during training.
+# Carved off before train/val, so val_acc is not leaked into model selection.
+test_split: 0.1
 seed: 42
 label_smoothing: 0.05
 gradient_accumulation_steps: 1

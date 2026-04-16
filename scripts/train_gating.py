@@ -244,11 +244,16 @@ def build_datasets(
     cfg: dict,
     max_samples_override: Optional[int],
     val_split: float,
+    test_split: float,
     seed: int,
     rank: int,
-) -> Tuple[GatingImageDataset, GatingImageDataset, int, List[str]]:
+) -> Tuple[GatingImageDataset, GatingImageDataset, GatingImageDataset, int, List[str]]:
     """
-    Load images from dataset_class_map, split into train/val, return datasets.
+    Load images from dataset_class_map, split into train/val/test, return datasets.
+
+    The test split is carved off first (before train/val) so the held-out test
+    set is deterministic and never influences training. Pass test_split=0 to
+    disable the held-out test set (returns an empty dataset as the third element).
     """
     dataset_class_map: Dict = cfg.get("dataset_class_map", {})
     class_labels: List[str] = cfg.get("class_labels", DEFAULT_CLASS_LABELS)
@@ -286,32 +291,41 @@ def build_datasets(
         all_images.extend(class_images)
         all_labels.extend([class_idx] * len(class_images))
 
-    # Shuffle and split
+    # Shuffle and split — test is carved off first so it is always the same
     combined = list(zip(all_images, all_labels))
     rng.shuffle(combined)
 
-    n_val = int(len(combined) * val_split)
-    train_pairs = combined[: len(combined) - n_val]
-    val_pairs = combined[len(combined) - n_val :]
+    n_test = int(len(combined) * test_split) if test_split > 0 else 0
+    test_pairs  = combined[len(combined) - n_test :] if n_test > 0 else []
+    remaining   = combined[: len(combined) - n_test]
+
+    n_val = int(len(remaining) * val_split)
+    train_pairs = remaining[: len(remaining) - n_val]
+    val_pairs   = remaining[len(remaining) - n_val :]
 
     train_imgs, train_lbls = (list(t) for t in zip(*train_pairs)) if train_pairs else ([], [])
-    val_imgs, val_lbls = (list(t) for t in zip(*val_pairs)) if val_pairs else ([], [])
+    val_imgs,   val_lbls   = (list(t) for t in zip(*val_pairs))   if val_pairs   else ([], [])
+    test_imgs,  test_lbls  = (list(t) for t in zip(*test_pairs))  if test_pairs  else ([], [])
 
     train_ds = GatingImageDataset(train_imgs, train_lbls, get_train_transform())
-    val_ds = GatingImageDataset(val_imgs, val_lbls, get_val_transform())
+    val_ds   = GatingImageDataset(val_imgs,   val_lbls,   get_val_transform())
+    test_ds  = GatingImageDataset(test_imgs,  test_lbls,  get_val_transform())
 
-    log(rank, f"\n  Train: {len(train_ds)} samples, Val: {len(val_ds)} samples")
+    log(rank, f"\n  Train: {len(train_ds)} samples, Val: {len(val_ds)} samples, Test: {len(test_ds)} samples")
 
     # Print class distributions
     if is_main(rank):
-        for split_name, labels in [("Train", train_lbls), ("Val", val_lbls)]:
+        splits = [("Train", train_lbls), ("Val", val_lbls)]
+        if test_lbls:
+            splits.append(("Test (held-out)", test_lbls))
+        for split_name, labels in splits:
             counts = Counter(labels)
             print(f"  {split_name} class distribution:")
             for c in range(num_classes):
                 lbl = class_labels[c] if c < len(class_labels) else str(c)
                 print(f"    {lbl}: {counts.get(c, 0)}")
 
-    return train_ds, val_ds, num_classes, class_labels
+    return train_ds, val_ds, test_ds, num_classes, class_labels
 
 
 # ─── Training ────────────────────────────────────────────────────────────────
@@ -338,6 +352,7 @@ def train(config: dict):
     num_workers       = int(config.get("num_workers", 4))
     max_samples       = int(config.get("max_samples_per_class", 0))
     val_split         = float(config.get("val_split", 0.1))
+    test_split        = float(config.get("test_split", 0.1))
     save_every        = int(config.get("save_every_n_epochs", 5))
     seed              = int(config.get("seed", 42))
     use_wandb         = config.get("use_wandb", False)
@@ -426,10 +441,10 @@ def train(config: dict):
 
     # ── Build datasets ──
     log(rank, "\nLoading datasets ...")
-    train_ds, val_ds, num_classes, class_labels = build_datasets(
+    train_ds, val_ds, test_ds, num_classes, class_labels = build_datasets(
         {**config, "dataset_class_map": dataset_class_map},
         max_samples if max_samples > 0 else None,
-        val_split, seed, rank,
+        val_split, test_split, seed, rank,
     )
 
     train_sampler = DistributedSampler(train_ds, shuffle=True) if is_distributed else None
@@ -617,9 +632,87 @@ def train(config: dict):
         raw_model.save_pretrained(final_path)
         print(f"\nTraining complete. Final model → {final_path}")
         print(f"Best validation accuracy: {best_val_acc:.4f}")
-        if use_wandb:
-            import wandb
-            wandb.finish()
+
+    # ── Held-out test evaluation ──
+    if len(test_ds) > 0:
+        log(rank, "\nRunning held-out test evaluation ...")
+        test_sampler = DistributedSampler(test_ds, shuffle=False) if is_distributed else None
+        test_loader = DataLoader(
+            test_ds, batch_size=batch_size, shuffle=False, sampler=test_sampler,
+            num_workers=num_workers, pin_memory=True,
+        )
+
+        # Load best checkpoint for test eval
+        best_path = os.path.join(output_dir, "best")
+        if os.path.isdir(best_path):
+            log(rank, f"  Loading best checkpoint from {best_path}")
+            eval_model = GatingNetwork.from_pretrained(best_path)
+            eval_model.to(device)
+            eval_model.eval()
+        else:
+            eval_model = raw_model
+            eval_model.eval()
+
+        test_correct = 0
+        test_total = 0
+        class_correct_test = [0] * num_classes
+        class_total_test = [0] * num_classes
+
+        with torch.no_grad():
+            for images, labels in test_loader:
+                images = images.to(device, non_blocking=True)
+                labels = labels.to(device, non_blocking=True)
+                logits, _, _ = eval_model(images)
+                preds = logits.argmax(dim=-1)
+                test_correct += (preds == labels).sum().item()
+                test_total += labels.size(0)
+                for c in range(num_classes):
+                    mask = labels == c
+                    class_total_test[c] += mask.sum().item()
+                    class_correct_test[c] += ((preds == labels) & mask).sum().item()
+
+        test_acc = test_correct / max(test_total, 1)
+
+        if is_main(rank):
+            print(f"\n{'='*60}")
+            print(f"  Held-out Test Results (n={test_total})")
+            print(f"  Overall accuracy: {test_acc:.4f} ({test_correct}/{test_total})")
+            print(f"{'='*60}")
+            for c in range(num_classes):
+                c_acc = class_correct_test[c] / max(class_total_test[c], 1)
+                lbl = class_labels[c] if c < len(class_labels) else f"class_{c}"
+                bar = "█" * int(c_acc * 30)
+                print(f"  {lbl:<15} {c_acc:.4f} ({class_correct_test[c]:>5}/{class_total_test[c]:<5}) {bar}")
+
+            # Save test results to JSON
+            import json
+            test_results = {
+                "overall_accuracy": test_acc,
+                "total_samples": test_total,
+                "per_class": {
+                    class_labels[c] if c < len(class_labels) else f"class_{c}": {
+                        "correct": class_correct_test[c],
+                        "total": class_total_test[c],
+                        "accuracy": class_correct_test[c] / max(class_total_test[c], 1),
+                    }
+                    for c in range(num_classes)
+                },
+            }
+            results_path = os.path.join(output_dir, "test_results.json")
+            with open(results_path, "w") as f:
+                json.dump(test_results, f, indent=2)
+            print(f"\n  Test results saved → {results_path}")
+
+            if use_wandb:
+                import wandb
+                wandb.log({"test/overall_accuracy": test_acc})
+                for c in range(num_classes):
+                    lbl = class_labels[c] if c < len(class_labels) else f"class_{c}"
+                    wandb.log({f"test/accuracy_{lbl}": class_correct_test[c] / max(class_total_test[c], 1)})
+
+    if is_main(rank) and use_wandb:
+        import wandb
+        wandb.finish()
 
     cleanup_distributed()
 
@@ -656,6 +749,8 @@ def parse_args():
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--num_classes", type=int, default=None)
     p.add_argument("--val_split", type=float, default=None)
+    p.add_argument("--test_split", type=float, default=None,
+                   help="Fraction of data held out as a separate test set (default: 0.1). Set 0 to disable.")
     p.add_argument("--weight_decay", type=float, default=None)
     p.add_argument("--label_smoothing", type=float, default=None)
     p.add_argument("--save_every_n_epochs", type=int, default=None)
@@ -704,6 +799,7 @@ if __name__ == "__main__":
     config.setdefault("num_workers", 4)
     config.setdefault("max_samples_per_class", 0)
     config.setdefault("val_split", 0.1)
+    config.setdefault("test_split", 0.1)
     config.setdefault("save_every_n_epochs", 5)
     config.setdefault("seed", 42)
     config.setdefault("use_wandb", False)
