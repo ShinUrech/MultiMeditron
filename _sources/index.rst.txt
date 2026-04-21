@@ -59,7 +59,23 @@ Features:
 - **Easy to install**: We provide Docker images for easier reproducibility
 
 
-📚 Documentation
+📄 Related Papers
+=================
+
+**MultiMeditron Reports**
+
+- :download:`MultiMeditron MSc Report 2026 — Schifferli, Chappuis, Tagemouati, Martins, Chahed, Ouazzani, Deschryver, Turan (PDF) <_static/papers/multimeditron-report-2026-team.pdf>` — EPFL LiGHT lab, 2026.
+- :download:`MultiMeditron MSc Report 2026 — Zhang (PDF) <_static/papers/multimeditron-report-2026-zhang.pdf>` — EPFL LiGHT lab, 2026.
+
+**Medical AI Surveys**
+
+- `A Survey on Large Language Models for Medical Time Series <https://www.sciencedirect.com/science/article/pii/S0957417426002770>`_ — Expert Systems with Applications, 2026.
+
+**Multimodal Medical AI**
+
+- `MedMO: Grounding and Understanding Multimodal Large Language Model for Medical Images <https://arxiv.org/abs/2602.06965>`_ — arXiv:2602.06965, 2026.
+
+�📚 Documentation
 ================
 
 .. toctree::
