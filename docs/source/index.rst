@@ -59,26 +59,21 @@ Features:
 - **Easy to install**: We provide Docker images for easier reproducibility
 
 
-� Related Papers
+📄 Related Papers
 =================
 
-**Foundation Models**
+**MultiMeditron Reports**
 
-- `The Llama 3 Herd of Models <https://arxiv.org/abs/2407.21783>`_ — Grattafiori et al., Meta AI, 2024.
-- `MEDITRON-70B: Scaling Medical Pretraining for Large Language Models <https://arxiv.org/abs/2311.16079>`_ — Chen et al., EPFL, 2023.
-- `Learning Transferable Visual Models From Natural Language Supervision <https://arxiv.org/abs/2103.00020>`_ — Radford et al., OpenAI, 2021. (CLIP ViT-B/32, used as expert encoders)
+- :download:`MultiMeditron MSc Report 2026 — Schifferli, Chappuis, Tagemouati, Martins, Chahed, Ouazzani, Deschryver, Turan (PDF) <_static/papers/multimeditron-report-2026-team.pdf>` — EPFL LiGHT lab, 2026.
+- :download:`MultiMeditron MSc Report 2026 — Zhang (PDF) <_static/papers/multimeditron-report-2026-zhang.pdf>` — EPFL LiGHT lab, 2026.
 
-**Multimodal & MoE Architecture**
+**Medical AI Surveys**
 
-- `BiomedCLIP: a multimodal biomedical foundation model pretrained from fifteen million scientific figure-caption pairs <https://arxiv.org/abs/2303.00915>`_ — Zhang et al., Microsoft Research, 2023.
-- `Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer <https://arxiv.org/abs/1701.06538>`_ — Shazeer et al., Google Brain, 2017.
+- `A Survey on Large Language Models for Medical Time Series <https://www.sciencedirect.com/science/article/pii/S0957417426002770>`_ — Expert Systems with Applications, 2026.
 
-**Evaluation Benchmarks**
+**Multimodal Medical AI**
 
-- `GMAI-MMBench: A Comprehensive Multimodal Evaluation Benchmark Towards General Medical AI <https://arxiv.org/abs/2408.03361>`_ — Chen et al., 2024.
-- `PathVQA: 30000+ Questions for Medical Visual Question Answering <https://arxiv.org/abs/2003.10286>`_ — He et al., 2020.
-- `SLAKE: A Semantically-Labeled Knowledge-Enhanced Dataset for Medical Visual Question Answering <https://arxiv.org/abs/2102.09542>`_ — Liu et al., 2021.
-
+- `MedMO: Grounding and Understanding Multimodal Large Language Model for Medical Images <https://arxiv.org/abs/2602.06965>`_ — arXiv:2602.06965, 2026.
 
 �📚 Documentation
 ================
