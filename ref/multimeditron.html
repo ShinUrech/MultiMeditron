@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>multimeditron package - MultiMeditron 1.0.0 documentation</title><link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="multimeditron.cli package" href="multimeditron.cli.html" /><link rel="prev" title="multimeditron" href="modules.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
-  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1c6635e" />
+  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=e1a1ceaf" />
     <link rel="stylesheet" type="text/css" href="../_static/shibuya.css?v=44020203" />
     <link media="print" rel="stylesheet" type="text/css" href="../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -99,32 +99,8 @@ data-aria-dark="Switch to auto color mode">
     <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
 <li><a class="reference internal" href="#subpackages">Subpackages</a></li>
 <li><a class="reference internal" href="#submodules">Submodules</a></li>
-<li><a class="reference internal" href="#module-multimeditron.profiling">multimeditron.profiling module</a><ul>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback"><code class="docutils literal notranslate"><span class="pre">NvtxAnnotationCallback</span></code></a><ul>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_epoch_begin"><code class="docutils literal notranslate">on_epoch_begin()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_epoch_end"><code class="docutils literal notranslate">on_epoch_end()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_evaluate"><code class="docutils literal notranslate">on_evaluate()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_forward_begin"><code class="docutils literal notranslate">on_forward_begin()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_forward_end"><code class="docutils literal notranslate">on_forward_end()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_init_end"><code class="docutils literal notranslate">on_init_end()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_log"><code class="docutils literal notranslate">on_log()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_optimizer_step"><code class="docutils literal notranslate">on_optimizer_step()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_pre_optimizer_step"><code class="docutils literal notranslate">on_pre_optimizer_step()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_predict"><code class="docutils literal notranslate">on_predict()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_prediction_step"><code class="docutils literal notranslate">on_prediction_step()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_prepare_inputs_begin"><code class="docutils literal notranslate">on_prepare_inputs_begin()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_prepare_inputs_end"><code class="docutils literal notranslate">on_prepare_inputs_end()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_save"><code class="docutils literal notranslate">on_save()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_step_begin"><code class="docutils literal notranslate">on_step_begin()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_step_end"><code class="docutils literal notranslate">on_step_end()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_substep_end"><code class="docutils literal notranslate">on_substep_end()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_train_begin"><code class="docutils literal notranslate">on_train_begin()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.profiling.NvtxAnnotationCallback.on_train_end"><code class="docutils literal notranslate">on_train_end()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a class="reference internal" href="#module-multimeditron">Module contents</a></li>
+<li><a class="reference internal" href="#multimeditron-profiling-module">multimeditron.profiling module</a></li>
+<li><a class="reference internal" href="#module-contents">Module contents</a></li>
 </ul>
 </div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
   </aside>
@@ -186,131 +162,11 @@ data-aria-dark="Switch to auto color mode">
 <section id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
 </section>
-<section id="module-multimeditron.profiling">
-<span id="multimeditron-profiling-module"></span><h2>multimeditron.profiling module<a class="headerlink" href="#module-multimeditron.profiling" title="Link to this heading">¶</a></h2>
-<dl class="py class">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">multimeditron.profiling.</span></span><span class="sig-name descname"><span class="pre">NvtxAnnotationCallback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">global_step_start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_step_stop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">120</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">TrainerCallback</span></code></p>
-<p>”
-Adding NVTX annotations for profiling with Nsight Systems.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_epoch_begin">
-<span class="sig-name descname"><span class="pre">on_epoch_begin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_epoch_begin" title="Link to this definition">¶</a></dt>
-<dd><p>Event called at the beginning of an epoch.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_epoch_end">
-<span class="sig-name descname"><span class="pre">on_epoch_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_epoch_end" title="Link to this definition">¶</a></dt>
-<dd><p>Event called at the end of an epoch.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_evaluate">
-<span class="sig-name descname"><span class="pre">on_evaluate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_metrics</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_evaluate" title="Link to this definition">¶</a></dt>
-<dd><p>Event called after an evaluation phase.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_forward_begin">
-<span class="sig-name descname"><span class="pre">on_forward_begin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_forward_begin" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_forward_end">
-<span class="sig-name descname"><span class="pre">on_forward_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_forward_end" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_init_end">
-<span class="sig-name descname"><span class="pre">on_init_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_init_end" title="Link to this definition">¶</a></dt>
-<dd><p>Event called at the end of the initialization of the [<cite>Trainer</cite>].</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_log">
-<span class="sig-name descname"><span class="pre">on_log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logs</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_log" title="Link to this definition">¶</a></dt>
-<dd><p>Event called after logging the last logs.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_optimizer_step">
-<span class="sig-name descname"><span class="pre">on_optimizer_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_optimizer_step" title="Link to this definition">¶</a></dt>
-<dd><p>Event called after the optimizer step but before gradients are zeroed out. Useful for monitoring gradients.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_pre_optimizer_step">
-<span class="sig-name descname"><span class="pre">on_pre_optimizer_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_pre_optimizer_step" title="Link to this definition">¶</a></dt>
-<dd><p>Event called before the optimizer step but after gradient clipping. Useful for monitoring gradients.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_predict">
-<span class="sig-name descname"><span class="pre">on_predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_metrics</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_predict" title="Link to this definition">¶</a></dt>
-<dd><p>Event called after a successful prediction.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_prediction_step">
-<span class="sig-name descname"><span class="pre">on_prediction_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_prediction_step" title="Link to this definition">¶</a></dt>
-<dd><p>Event called after a prediction step.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_prepare_inputs_begin">
-<span class="sig-name descname"><span class="pre">on_prepare_inputs_begin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_prepare_inputs_begin" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_prepare_inputs_end">
-<span class="sig-name descname"><span class="pre">on_prepare_inputs_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_prepare_inputs_end" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_save">
-<span class="sig-name descname"><span class="pre">on_save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_save" title="Link to this definition">¶</a></dt>
-<dd><p>Event called after a checkpoint save.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_step_begin">
-<span class="sig-name descname"><span class="pre">on_step_begin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_step_begin" title="Link to this definition">¶</a></dt>
-<dd><p>Event called at the beginning of a training step. If using gradient accumulation, one training step might take
-several inputs.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_step_end">
-<span class="sig-name descname"><span class="pre">on_step_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_step_end" title="Link to this definition">¶</a></dt>
-<dd><p>Event called at the end of a training step. If using gradient accumulation, one training step might take
-several inputs.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_substep_end">
-<span class="sig-name descname"><span class="pre">on_substep_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_substep_end" title="Link to this definition">¶</a></dt>
-<dd><p>Event called at the end of an substep during gradient accumulation.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_train_begin">
-<span class="sig-name descname"><span class="pre">on_train_begin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_train_begin" title="Link to this definition">¶</a></dt>
-<dd><p>Event called at the beginning of training.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.profiling.NvtxAnnotationCallback.on_train_end">
-<span class="sig-name descname"><span class="pre">on_train_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.profiling.NvtxAnnotationCallback.on_train_end" title="Link to this definition">¶</a></dt>
-<dd><p>Event called at the end of training.</p>
-</dd></dl>
-
-</dd></dl>
-
+<section id="multimeditron-profiling-module">
+<h2>multimeditron.profiling module<a class="headerlink" href="#multimeditron-profiling-module" title="Link to this heading">¶</a></h2>
 </section>
-<section id="module-multimeditron">
-<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-multimeditron" title="Link to this heading">¶</a></h2>
+<section id="module-contents">
+<h2>Module contents<a class="headerlink" href="#module-contents" title="Link to this heading">¶</a></h2>
 </section>
 </section>
 
@@ -355,7 +211,7 @@ several inputs.</p>
   </div>
 </footer>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/shibuya.js?v=cac61aee"></script></body>
 </html>

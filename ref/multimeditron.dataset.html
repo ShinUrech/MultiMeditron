@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>multimeditron.dataset package - MultiMeditron 1.0.0 documentation</title><link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="multimeditron.dataset.loader package" href="multimeditron.dataset.loader.html" /><link rel="prev" title="multimeditron.cli package" href="multimeditron.cli.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
-  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1c6635e" />
+  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=e1a1ceaf" />
     <link rel="stylesheet" type="text/css" href="../_static/shibuya.css?v=44020203" />
     <link media="print" rel="stylesheet" type="text/css" href="../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -99,15 +99,8 @@ data-aria-dark="Switch to auto color mode">
     <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
 <li><a class="reference internal" href="#subpackages">Subpackages</a></li>
 <li><a class="reference internal" href="#submodules">Submodules</a></li>
-<li><a class="reference internal" href="#module-multimeditron.dataset.sample_preprocessor">multimeditron.dataset.sample_preprocessor module</a><ul>
-<li><a class="reference internal" href="#multimeditron.dataset.sample_preprocessor.SamplePreprocessor"><code class="docutils literal notranslate"><span class="pre">SamplePreprocessor</span></code></a><ul>
-<li><a class="reference internal" href="#multimeditron.dataset.sample_preprocessor.SamplePreprocessor.process_modality_to_tensor"><code class="docutils literal notranslate">process_modality_to_tensor()</span></code></a></li>
-<li><a class="reference internal" href="#multimeditron.dataset.sample_preprocessor.SamplePreprocessor.tokenize"><code class="docutils literal notranslate">tokenize()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a class="reference internal" href="#module-multimeditron.dataset">Module contents</a></li>
+<li><a class="reference internal" href="#multimeditron-dataset-sample-preprocessor-module">multimeditron.dataset.sample_preprocessor module</a></li>
+<li><a class="reference internal" href="#module-contents">Module contents</a></li>
 </ul>
 </div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
   </aside>
@@ -162,81 +155,11 @@ data-aria-dark="Switch to auto color mode">
 <section id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
 </section>
-<section id="module-multimeditron.dataset.sample_preprocessor">
-<span id="multimeditron-dataset-sample-preprocessor-module"></span><h2>multimeditron.dataset.sample_preprocessor module<a class="headerlink" href="#module-multimeditron.dataset.sample_preprocessor" title="Link to this heading">¶</a></h2>
-<dl class="py class">
-<dt class="sig sig-object py" id="multimeditron.dataset.sample_preprocessor.SamplePreprocessor">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">multimeditron.dataset.sample_preprocessor.</span></span><span class="sig-name descname"><span class="pre">SamplePreprocessor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tokenizer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">PreTrainedTokenizerBase</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chat_template</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="multimeditron.model.html#multimeditron.model.model.ChatTemplate" title="multimeditron.model.model.ChatTemplate"><span class="pre">ChatTemplate</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">modality_processors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="multimeditron.model.modalities.html#multimeditron.model.modalities.BaseModalityProcessor" title="multimeditron.model.modalities.base.BaseModalityProcessor"><span class="pre">BaseModalityProcessor</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attachment_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimeditron.dataset.sample_preprocessor.SamplePreprocessor" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<p>A class designed to preprocess input data samples for multimodal models.</p>
-<p>This class is responsible for handling the tokenization of input samples
-and processing modality-specific data into tensors. It serves as the
-intermediary between the raw input data and the model-ready format,
-leveraging modality-specific processing logic and tokenizers.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.dataset.sample_preprocessor.SamplePreprocessor.process_modality_to_tensor">
-<span class="sig-name descname"><span class="pre">process_modality_to_tensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#multimeditron.dataset.sample_preprocessor.SamplePreprocessor.process_modality_to_tensor" title="Link to this definition">¶</a></dt>
-<dd><p>Process modality-specific data in the input samples into tensors.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>samples</strong> (<em>List</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em>) – A list of input samples where each sample contains modality-specific data.</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A list of dictionaries where each dictionary has processed modality data represented as tensors.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>List[Dict[str, Any]]</p>
-</dd>
-</dl>
-<p>Example:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="n">samples</span> <span class="o">=</span> <span class="p">[</span>
-</span><span data-line="2">    <span class="p">{</span><span class="s2">&quot;modalities&quot;</span><span class="p">:</span> <span class="p">[</span>
-</span><span data-line="3">        <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;image&quot;</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;image&quot;</span><span class="p">}</span>
-</span><span data-line="4">    <span class="p">]}</span>
-</span><span data-line="5"><span class="p">]</span>
-</span><span data-line="6"><span class="n">processed_samples</span> <span class="o">=</span> <span class="n">sample_preprocessor</span><span class="o">.</span><span class="n">process_modality_to_tensor</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
-</span></pre></div>
-</div>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="multimeditron.dataset.sample_preprocessor.SamplePreprocessor.tokenize">
-<span class="sig-name descname"><span class="pre">tokenize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#multimeditron.dataset.sample_preprocessor.SamplePreprocessor.tokenize" title="Link to this definition">¶</a></dt>
-<dd><p>Tokenize a batch of input samples using the prompt tokenizer.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>samples</strong> (<em>List</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em>) – A batch of input samples where each sample is a dictionary containing
-raw data to be tokenized.</p></li>
-<li><p><strong>kwargs</strong> – Additional arguments to customize the tokenization process.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A list of dictionaries representing tokenized samples.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>List[Dict[str, Any]]</p>
-</dd>
-</dl>
-<p>Example:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="n">samples</span> <span class="o">=</span> <span class="p">[</span>
-</span><span data-line="2">    <span class="p">{</span><span class="s2">&quot;conversations&quot;</span><span class="p">:</span>
-</span><span data-line="3">        <span class="p">{</span>
-</span><span data-line="4">            <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span>
-</span><span data-line="5">            <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Describe the image in detail.&quot;</span>
-</span><span data-line="6">        <span class="p">}</span>
-</span><span data-line="7">    <span class="p">},</span>
-</span><span data-line="8"><span class="p">]</span>
-</span><span data-line="9"><span class="n">tokenized_samples</span> <span class="o">=</span> <span class="n">sample_preprocessor</span><span class="o">.</span><span class="n">tokenize</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
-</span></pre></div>
-</div>
-</dd></dl>
-
-</dd></dl>
-
+<section id="multimeditron-dataset-sample-preprocessor-module">
+<h2>multimeditron.dataset.sample_preprocessor module<a class="headerlink" href="#multimeditron-dataset-sample-preprocessor-module" title="Link to this heading">¶</a></h2>
 </section>
-<section id="module-multimeditron.dataset">
-<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-multimeditron.dataset" title="Link to this heading">¶</a></h2>
+<section id="module-contents">
+<h2>Module contents<a class="headerlink" href="#module-contents" title="Link to this heading">¶</a></h2>
 </section>
 </section>
 
@@ -281,7 +204,7 @@ raw data to be tokenized.</p></li>
   </div>
 </footer>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/shibuya.js?v=cac61aee"></script></body>
 </html>

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Adding new modality - MultiMeditron 1.0.0 documentation</title><link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Dataset format" href="dataset_format.html" /><link rel="prev" title="Quickstart" href="quickstart.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
-  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1c6635e" />
+  </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=e1a1ceaf" />
     <link rel="stylesheet" type="text/css" href="../_static/shibuya.css?v=44020203" />
     <link media="print" rel="stylesheet" type="text/css" href="../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -172,33 +172,33 @@ data-aria-dark="Switch to auto color mode">
 <h2>Implementation example<a class="headerlink" href="#implementation-example" title="Link to this heading">¶</a></h2>
 <p>To create a new modality embedder, you need to implement 3 classes:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="../ref/multimeditron.dataset.loader.html#multimeditron.dataset.loader.BaseModalityLoader" title="multimeditron.dataset.loader.BaseModalityLoader"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityLoader</span></code></a> (only if implementing a new modality type): The modality loader to load the modality from the dataset</p></li>
-<li><p><a class="reference internal" href="../ref/multimeditron.model.modalities.html#multimeditron.model.modalities.BaseModalityConfig" title="multimeditron.model.modalities.base.BaseModalityConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityConfig</span></code></a>: The configuration file for both the processor and the modality model</p></li>
-<li><p><a class="reference internal" href="../ref/multimeditron.model.modalities.html#multimeditron.model.modalities.BaseModalityProcessor" title="multimeditron.model.modalities.base.BaseModalityProcessor"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityProcessor</span></code></a>: The processor class to preprocess your modalities</p></li>
-<li><p><a class="reference internal" href="../ref/multimeditron.model.modalities.html#multimeditron.model.modalities.BaseModality" title="multimeditron.model.modalities.base.BaseModality"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModality</span></code></a>: The modality model that forward your modalities</p></li>
+<li><p><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityLoader</span></code> (only if implementing a new modality type): The modality loader to load the modality from the dataset</p></li>
+<li><p><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityConfig</span></code>: The configuration file for both the processor and the modality model</p></li>
+<li><p><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityProcessor</span></code>: The processor class to preprocess your modalities</p></li>
+<li><p><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModality</span></code>: The modality model that forward your modalities</p></li>
 </ul>
 <p>In this walkthrough, we will show how to load images and how to create a simple modality embedder.</p>
 <section id="modality-loader">
 <h3>Modality loader<a class="headerlink" href="#modality-loader" title="Link to this heading">¶</a></h3>
 <p>Here is an example to load images from bytes:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Union</span>
-</span><span data-line="2"><span class="kn">from</span> <span class="nn">multimeditron.dataset.loader</span> <span class="kn">import</span> <span class="n">BaseModalityLoader</span><span class="p">,</span> <span class="n">AutoModalityLoader</span>
-</span><span data-line="3"><span class="kn">from</span> <span class="nn">multimeditron.model.constants</span> <span class="kn">import</span> <span class="n">MODALITY_VALUE_KEY</span>
-</span><span data-line="4"><span class="kn">import</span> <span class="nn">PIL</span>
-</span><span data-line="5"><span class="kn">import</span> <span class="nn">io</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Union</span>
+</span><span data-line="2"><span class="kn">from</span><span class="w"> </span><span class="nn">multimeditron.dataset.loader</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModalityLoader</span><span class="p">,</span> <span class="n">AutoModalityLoader</span>
+</span><span data-line="3"><span class="kn">from</span><span class="w"> </span><span class="nn">multimeditron.model.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">MODALITY_VALUE_KEY</span>
+</span><span data-line="4"><span class="kn">import</span><span class="w"> </span><span class="nn">PIL</span>
+</span><span data-line="5"><span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
 </span><span data-line="6">
 </span><span data-line="7"><span class="nd">@AutoModalityLoader</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;raw-image&quot;</span><span class="p">)</span>
-</span><span data-line="8"><span class="k">class</span> <span class="nc">RawImageLoader</span><span class="p">(</span><span class="n">BaseModalityLoader</span><span class="p">):</span>
-</span><span data-line="9">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="8"><span class="k">class</span><span class="w"> </span><span class="nc">RawImageLoader</span><span class="p">(</span><span class="n">BaseModalityLoader</span><span class="p">):</span>
+</span><span data-line="9">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="10">        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 </span><span data-line="11">
-</span><span data-line="12">    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">PIL</span><span class="o">.</span><span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">:</span>
+</span><span data-line="12">    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">PIL</span><span class="o">.</span><span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">:</span>
 </span><span data-line="13">        <span class="n">image_bytes</span> <span class="o">=</span> <span class="n">sample</span><span class="p">[</span><span class="n">MODALITY_VALUE_KEY</span><span class="p">][</span><span class="s2">&quot;bytes&quot;</span><span class="p">]</span>
 </span><span data-line="14">        <span class="n">image</span> <span class="o">=</span> <span class="n">PIL</span><span class="o">.</span><span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">image_bytes</span><span class="p">))</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;RGB&quot;</span><span class="p">)</span>
 </span><span data-line="15">        <span class="k">return</span> <span class="n">image</span>
 </span></pre></div>
 </div>
-<p>A modality loader should always inherit from <a class="reference internal" href="../ref/multimeditron.dataset.loader.html#multimeditron.dataset.loader.BaseModalityLoader" title="multimeditron.dataset.loader.BaseModalityLoader"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityLoader</span></code></a> and be registered using the python annotation <code class="xref py py-meth docutils literal notranslate"><span class="pre">register()</span></code></p>
+<p>A modality loader should always inherit from <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityLoader</span></code> and be registered using the python annotation <code class="xref py py-meth docutils literal notranslate"><span class="pre">register()</span></code></p>
 <p>The <code class="code docutils literal notranslate"><span class="pre">load</span></code> function has the following signature:</p>
 <ul class="simple">
 <li><p>Input: A dictionary that contains a key <code class="code docutils literal notranslate"><span class="pre">&quot;value&quot;</span></code>, i.e. <code class="code docutils literal notranslate"><span class="pre">{&quot;value&quot;</span> <span class="pre">:</span> <span class="pre">&lt;something&gt;}</span></code>. This is the case for every modality. The actual format of the value field depends on the dataset format. See <a class="reference internal" href="dataset_format.html#dataset-format-label"><span class="std std-ref">Dataset format</span></a></p></li>
@@ -209,10 +209,10 @@ data-aria-dark="Switch to auto color mode">
 <h3>Modality configuration<a class="headerlink" href="#modality-configuration" title="Link to this heading">¶</a></h3>
 <p>The configuration, processor, model architecture follows the same philosophy as <a class="reference external" href="https://huggingface.co/docs/transformers/custom_models">Huggingface custom model</a>.</p>
 <p>The configuration file configures both the processor and the modality:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">from</span> <span class="nn">multimeditron.model.modalities.base</span> <span class="kn">import</span> <span class="n">BaseModality</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">multimeditron.model.modalities.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModality</span>
 </span><span data-line="2">
-</span><span data-line="3"><span class="k">class</span> <span class="nc">ImageConfig</span><span class="p">(</span><span class="n">BaseModalityConfig</span><span class="p">):</span>
-</span><span data-line="4">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="3"><span class="k">class</span><span class="w"> </span><span class="nc">ImageConfig</span><span class="p">(</span><span class="n">BaseModalityConfig</span><span class="p">):</span>
+</span><span data-line="4">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
 </span><span data-line="5">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="6">        <span class="n">hidden_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4096</span><span class="p">,</span>
 </span><span data-line="7">        <span class="n">clip_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;openai/clip-vit-large-patch14&quot;</span><span class="p">,</span>
@@ -230,7 +230,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="19">        <span class="bp">self</span><span class="o">.</span><span class="n">projection_type</span> <span class="o">=</span> <span class="n">projection_type</span>
 </span></pre></div>
 </div>
-<p>Every configuration needs to inherit <a class="reference internal" href="../ref/multimeditron.model.modalities.html#multimeditron.model.modalities.BaseModalityConfig" title="multimeditron.model.modalities.base.BaseModalityConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityConfig</span></code></a> and call the <code class="code docutils literal notranslate"><span class="pre">__init__</span></code> function from <code class="code docutils literal notranslate"><span class="pre">BaseModalityConfig</span></code> wth the arguments:</p>
+<p>Every configuration needs to inherit <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityConfig</span></code> and call the <code class="code docutils literal notranslate"><span class="pre">__init__</span></code> function from <code class="code docutils literal notranslate"><span class="pre">BaseModalityConfig</span></code> wth the arguments:</p>
 <ul class="simple">
 <li><p><code class="code docutils literal notranslate"><span class="pre">modality_type</span></code>: which modality type does this processor/modality pair handle. This field should match the <code class="code docutils literal notranslate"><span class="pre">&quot;type&quot;</span></code> field in the dataset. See <a class="reference internal" href="dataset_format.html#dataset-format-label"><span class="std std-ref">Dataset format</span></a></p></li>
 <li><p><code class="code docutils literal notranslate"><span class="pre">hidden_size</span></code>: the projected shape of the modality embedder (i.e. the size of a LLM token embedding)</p></li>
@@ -239,15 +239,15 @@ data-aria-dark="Switch to auto color mode">
 </section>
 <section id="modality-pre-processor">
 <h3>Modality (pre)processor<a class="headerlink" href="#modality-pre-processor" title="Link to this heading">¶</a></h3>
-<p>A modality processor preprocess modalities to transform the raw modality from the loading step (here a <code class="code docutils literal notranslate"><span class="pre">PIL.Image.Image</span></code>) into a <code class="code docutils literal notranslate"><span class="pre">torch.Tensor</span></code>. This processing phase is applied during the collator phase (unlike the forward pass of the <a class="reference internal" href="../ref/multimeditron.model.modalities.html#multimeditron.model.modalities.BaseModality" title="multimeditron.model.modalities.base.BaseModality"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModality</span></code></a>)</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">from</span> <span class="nn">multimeditron.model.constants</span> <span class="kn">import</span> <span class="n">NUM_EMBEDDINGS_KEY</span><span class="p">,</span> <span class="n">MODALITY_VALUE_KEY</span>
-</span><span data-line="2"><span class="kn">from</span> <span class="nn">multimeditron.model.modalities.base</span> <span class="kn">import</span> <span class="n">BaseModalityProcessor</span>
-</span><span data-line="3"><span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoImageProcessor</span><span class="p">,</span> <span class="n">AutoConfig</span>
+<p>A modality processor preprocess modalities to transform the raw modality from the loading step (here a <code class="code docutils literal notranslate"><span class="pre">PIL.Image.Image</span></code>) into a <code class="code docutils literal notranslate"><span class="pre">torch.Tensor</span></code>. This processing phase is applied during the collator phase (unlike the forward pass of the <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModality</span></code>)</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">multimeditron.model.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">NUM_EMBEDDINGS_KEY</span><span class="p">,</span> <span class="n">MODALITY_VALUE_KEY</span>
+</span><span data-line="2"><span class="kn">from</span><span class="w"> </span><span class="nn">multimeditron.model.modalities.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModalityProcessor</span>
+</span><span data-line="3"><span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoImageProcessor</span><span class="p">,</span> <span class="n">AutoConfig</span>
 </span><span data-line="4">
-</span><span data-line="5"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
+</span><span data-line="5"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
 </span><span data-line="6">
-</span><span data-line="7"><span class="k">class</span> <span class="nc">ImageProcessor</span><span class="p">(</span><span class="n">BaseModalityProcessor</span><span class="p">):</span>
-</span><span data-line="8">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+</span><span data-line="7"><span class="k">class</span><span class="w"> </span><span class="nc">ImageProcessor</span><span class="p">(</span><span class="n">BaseModalityProcessor</span><span class="p">):</span>
+</span><span data-line="8">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
 </span><span data-line="9">        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
 </span><span data-line="10">        <span class="k">assert</span> <span class="n">config</span><span class="o">.</span><span class="n">clip_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;clip_name must be specified in the config&quot;</span>
 </span><span data-line="11">
@@ -256,7 +256,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="14">        <span class="n">feature_extractor_config</span> <span class="o">=</span> <span class="n">AutoConfig</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">clip_name</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span><span data-line="15">        <span class="bp">self</span><span class="o">.</span><span class="n">_num_patches_per_entry</span> <span class="o">=</span> <span class="p">(</span><span class="n">feature_extractor_config</span><span class="o">.</span><span class="n">vision_config</span><span class="o">.</span><span class="n">image_size</span> <span class="o">//</span> <span class="n">feature_extractor_config</span><span class="o">.</span><span class="n">vision_config</span><span class="o">.</span><span class="n">patch_size</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
 </span><span data-line="16">
-</span><span data-line="17">    <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">modality</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span data-line="17">    <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">modality</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 </span><span data-line="18">        <span class="n">processed_modality</span> <span class="o">=</span> <span class="n">modality</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 </span><span data-line="19">        <span class="n">image</span> <span class="o">=</span> <span class="n">modality</span><span class="p">[</span><span class="n">MODALITY_VALUE_KEY</span><span class="p">]</span>
 </span><span data-line="20">
@@ -266,7 +266,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="24">        <span class="k">return</span> <span class="n">processed_modality</span>
 </span></pre></div>
 </div>
-<p>Each processor must inherit <a class="reference internal" href="../ref/multimeditron.model.modalities.html#multimeditron.model.modalities.BaseModalityProcessor" title="multimeditron.model.modalities.base.BaseModalityProcessor"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityProcessor</span></code></a> (which inherit from <code class="xref py py-class docutils literal notranslate"><span class="pre">ProcessorMixin</span></code>).</p>
+<p>Each processor must inherit <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityProcessor</span></code> (which inherit from <code class="xref py py-class docutils literal notranslate"><span class="pre">ProcessorMixin</span></code>).</p>
 <p>The modality processor must impement the <code class="xref py py-meth docutils literal notranslate"><span class="pre">process()</span></code> function. This function takes:</p>
 <ul class="simple">
 <li><p>A <code class="code docutils literal notranslate"><span class="pre">Dict</span></code>, this is exactly the output of the previous loading phase</p></li>
@@ -276,24 +276,24 @@ data-aria-dark="Switch to auto color mode">
 <section id="modality-modeling">
 <h3>Modality modeling<a class="headerlink" href="#modality-modeling" title="Link to this heading">¶</a></h3>
 <p>Lastly, we implement the modality model. This is the model that performs the forward pass during training. To optimize GPU throughput, you should only put operations that can be parallelized on GPU.</p>
-<p>A modality class must inherit <a class="reference internal" href="../ref/multimeditron.model.modalities.html#multimeditron.model.modalities.BaseModality" title="multimeditron.model.modalities.base.BaseModality"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModality</span></code></a> is typically created with 2 main modules:</p>
+<p>A modality class must inherit <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModality</span></code> is typically created with 2 main modules:</p>
 <ol class="arabic simple">
 <li><p>A pretrained modality embedder (like a CLIP model): This module produces meaningful embeddings for given modalities</p></li>
-<li><p>A tunable projection module (usually a simple MLP or a linear layer): This module map embeddings from the modality embedder to the LLM embedding space. The dimension of this embedding space is given by the <cite>hidden_size</cite> attribute of <a class="reference internal" href="../ref/multimeditron.model.modalities.html#multimeditron.model.modalities.BaseModalityConfig" title="multimeditron.model.modalities.base.BaseModalityConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityConfig</span></code></a></p></li>
+<li><p>A tunable projection module (usually a simple MLP or a linear layer): This module map embeddings from the modality embedder to the LLM embedding space. The dimension of this embedding space is given by the <cite>hidden_size</cite> attribute of <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModalityConfig</span></code></p></li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">from</span> <span class="nn">multimeditron.model.constants</span> <span class="kn">import</span> <span class="n">NUM_EMBEDDINGS_KEY</span><span class="p">,</span> <span class="n">MODALITY_VALUE_KEY</span>
-</span><span data-line="2"><span class="kn">from</span> <span class="nn">multimeditron.model.modalities.base</span> <span class="kn">import</span> <span class="n">BaseModalityProcessor</span>
-</span><span data-line="3"><span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoModel</span><span class="p">,</span> <span class="n">AutoConfig</span>
-</span><span data-line="4"><span class="kn">import</span> <span class="nn">torch</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">multimeditron.model.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">NUM_EMBEDDINGS_KEY</span><span class="p">,</span> <span class="n">MODALITY_VALUE_KEY</span>
+</span><span data-line="2"><span class="kn">from</span><span class="w"> </span><span class="nn">multimeditron.model.modalities.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModalityProcessor</span>
+</span><span data-line="3"><span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoModel</span><span class="p">,</span> <span class="n">AutoConfig</span>
+</span><span data-line="4"><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 </span><span data-line="5">
-</span><span data-line="6"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
+</span><span data-line="6"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
 </span><span data-line="7">
 </span><span data-line="8"><span class="nd">@AutoModality</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;meditron_clip&quot;</span><span class="p">)</span>
-</span><span data-line="9"><span class="k">class</span> <span class="nc">ImageModality</span><span class="p">(</span><span class="n">BaseModality</span><span class="p">):</span>
+</span><span data-line="9"><span class="k">class</span><span class="w"> </span><span class="nc">ImageModality</span><span class="p">(</span><span class="n">BaseModality</span><span class="p">):</span>
 </span><span data-line="10">    <span class="n">config_class</span> <span class="o">=</span> <span class="n">ImageConfig</span>
 </span><span data-line="11">    <span class="n">preprocessor_class</span> <span class="o">=</span> <span class="n">ImageProcessor</span>
 </span><span data-line="12">
-</span><span data-line="13">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">ImageConfig</span><span class="p">):</span>
+</span><span data-line="13">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">ImageConfig</span><span class="p">):</span>
 </span><span data-line="14">        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
 </span><span data-line="15">
 </span><span data-line="16">        <span class="bp">self</span><span class="o">.</span><span class="n">vision_tower_name</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">clip_name</span>
@@ -305,7 +305,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="22">
 </span><span data-line="23">        <span class="bp">self</span><span class="o">.</span><span class="n">projector</span> <span class="o">=</span> <span class="n">MLPProjector</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">embedding_size</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
 </span><span data-line="24">
-</span><span data-line="25">    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">:</span>
+</span><span data-line="25">    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">:</span>
 </span><span data-line="26">        <span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </span><span data-line="27">        <span class="n">inputs</span> <span class="o">=</span> <span class="n">inputs</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">feature_extractor</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 </span><span data-line="28">        <span class="n">image_features</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_extractor</span><span class="o">.</span><span class="n">vision_model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span><span class="o">.</span><span class="n">last_hidden_state</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:,</span> <span class="p">:]</span>
@@ -314,15 +314,15 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="31">
 </span><span data-line="32">        <span class="k">return</span> <span class="n">projected</span>
 </span><span data-line="33">
-</span><span data-line="34">    <span class="k">def</span> <span class="nf">freeze_modality_embedder</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="34">    <span class="k">def</span><span class="w"> </span><span class="nf">freeze_modality_embedder</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="35">    <span class="k">for</span> <span class="n">parameters</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_extractor</span><span class="o">.</span><span class="n">parameters</span><span class="p">():</span>
 </span><span data-line="36">        <span class="n">parameters</span><span class="o">.</span><span class="n">requires_grad</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="37">
-</span><span data-line="38">    <span class="k">def</span> <span class="nf">unfreeze_modality_embedder</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="38">    <span class="k">def</span><span class="w"> </span><span class="nf">unfreeze_modality_embedder</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="39">        <span class="k">for</span> <span class="n">parameters</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_extractor</span><span class="o">.</span><span class="n">parameters</span><span class="p">():</span>
 </span><span data-line="40">            <span class="n">parameters</span><span class="o">.</span><span class="n">requires_grad</span> <span class="o">=</span> <span class="kc">True</span>
 </span><span data-line="41">
-</span><span data-line="42">    <span class="k">def</span> <span class="nf">unfreeze_projection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="42">    <span class="k">def</span><span class="w"> </span><span class="nf">unfreeze_projection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="43">        <span class="k">for</span> <span class="n">parameters</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">projector</span><span class="o">.</span><span class="n">parameters</span><span class="p">():</span>
 </span><span data-line="44">            <span class="n">parameters</span><span class="o">.</span><span class="n">requires_grad</span> <span class="o">=</span> <span class="kc">True</span>
 </span></pre></div>
@@ -385,7 +385,7 @@ data-aria-dark="Switch to auto color mode">
   </div>
 </footer>
       <script src="../_static/documentation_options.js?v=8d563738"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/shibuya.js?v=cac61aee"></script></body>
 </html>
