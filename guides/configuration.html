@@ -63,6 +63,8 @@ data-aria-dark="Switch to auto color mode">
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="training.html">Training a MultiMeditron model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="moe.html">Mixture-of-Experts (MoE) Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="evaluation.html">Evaluating a MultiMeditron model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="known_issues.html">Known issues</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Configuration Reference</a></li>
 </ul>
@@ -96,7 +98,10 @@ data-aria-dark="Switch to auto color mode">
     <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
       <i class="i-lucide close"></i>
     </button>
-    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
+<li><a class="reference internal" href="#moe-configuration">MoE Configuration</a></li>
+</ul>
+</div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
   </aside>
   <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
   <main class="sy-main w-full max-sm:max-w-full print:pt-6">
@@ -164,6 +169,42 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="31"><span class="nt">training_args</span><span class="p">:</span><span class="w"> </span><span class="c1"># Huggingface training arguments. Check the following documentation for more informations: https://huggingface.co/docs/transformers/main_classes/trainer#transformers.TrainingArguments</span>
 </span></pre></div>
 </div>
+<section id="moe-configuration">
+<h2>MoE Configuration<a class="headerlink" href="#moe-configuration" title="Link to this heading">¶</a></h2>
+<p>When using a Mixture-of-Experts (MoE) vision encoder, the <code class="docutils literal notranslate"><span class="pre">modalities</span></code> section requires additional fields.</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">modalities.config.model_type</span></code></dt><dd><p>Set to <code class="docutils literal notranslate"><span class="pre">moe_meditron_clip</span></code> (or <code class="docutils literal notranslate"><span class="pre">moe_meditron_clip_pep</span></code> for PEP-gated variants).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">modalities.config.expert_clip_names</span></code></dt><dd><p>A list of paths to the expert CLIP model checkpoints. Each entry corresponds to one domain expert (e.g. CT, MRI, X-ray).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">modalities.config.gating_path</span></code></dt><dd><p>Path to the trained gating network that routes images to the appropriate experts.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">modalities.config.fusion_method</span></code></dt><dd><p>How expert outputs are combined. Supported values: <code class="docutils literal notranslate"><span class="pre">cross_attn</span></code> (attention-based fusion) or <code class="docutils literal notranslate"><span class="pre">average</span></code> (simple averaging).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">modalities.config.expert_projection</span></code></dt><dd><p>Projection strategy for expert embeddings. Supported values: <code class="docutils literal notranslate"><span class="pre">per_expert</span></code> (one projection per expert) or <code class="docutils literal notranslate"><span class="pre">shared</span></code> (single shared projection).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">modalities.config.image_processor</span></code></dt><dd><p>Path to the shared image processor used by all experts (e.g. a CLIP ViT-B/32 processor).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">modalities.config.top_k_experts</span></code></dt><dd><p>Number of experts to activate per image (optional, defaults to all).</p>
+</dd>
+</dl>
+<p>Below is a complete example YAML snippet for an MoE configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="nt">modalities</span><span class="p">:</span>
+</span><span data-line="2"><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">model_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">moe_meditron_clip_pep</span>
+</span><span data-line="3"><span class="w">    </span><span class="nt">image_processor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/clip-vit-base-patch32</span>
+</span><span data-line="4"><span class="w">    </span><span class="nt">hidden_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4096</span>
+</span><span data-line="5"><span class="w">    </span><span class="nt">expert_clip_names</span><span class="p">:</span>
+</span><span data-line="6"><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/expert-ct</span>
+</span><span data-line="7"><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/expert-mri</span>
+</span><span data-line="8"><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/expert-ultrasound</span>
+</span><span data-line="9"><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/expert-xray</span>
+</span><span data-line="10"><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/expert-generalist</span>
+</span><span data-line="11"><span class="w">    </span><span class="nt">gating_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/gating-network</span>
+</span><span data-line="12"><span class="w">    </span><span class="nt">fusion_method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cross_attn</span>
+</span><span data-line="13"><span class="w">    </span><span class="nt">top_k_experts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+</span></pre></div>
+</div>
+</section>
 </section>
 
         </article><button class="back-to-top" type="button">

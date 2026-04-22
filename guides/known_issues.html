@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Known issues - MultiMeditron 1.0.0 documentation</title><link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Configuration Reference" href="configuration.html" /><link rel="prev" title="Training a MultiMeditron model" href="training.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Known issues - MultiMeditron 1.0.0 documentation</title><link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Configuration Reference" href="configuration.html" /><link rel="prev" title="Evaluating a MultiMeditron model" href="evaluation.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=e1a1ceaf" />
@@ -63,6 +63,8 @@ data-aria-dark="Switch to auto color mode">
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="training.html">Training a MultiMeditron model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="moe.html">Mixture-of-Experts (MoE) Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="evaluation.html">Evaluating a MultiMeditron model</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Known issues</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Configuration Reference</a></li>
 </ul>
@@ -98,6 +100,7 @@ data-aria-dark="Switch to auto color mode">
     </button>
     <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
 <li><a class="reference internal" href="#wrong-permissions-with-docker-images">Wrong permissions with Docker images</a></li>
+<li><a class="reference internal" href="#envsubst-breaks-slurm-variables">envsubst breaks SLURM variables</a></li>
 </ul>
 </div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
   </aside>
@@ -158,6 +161,14 @@ data-aria-dark="Switch to auto color mode">
 </span></pre></div>
 </div>
 </section>
+<section id="envsubst-breaks-slurm-variables">
+<h2>envsubst breaks SLURM variables<a class="headerlink" href="#envsubst-breaks-slurm-variables" title="Link to this heading">¶</a></h2>
+<p>On some HPC systems, <code class="docutils literal notranslate"><span class="pre">envsubst</span></code> substitutes all <code class="docutils literal notranslate"><span class="pre">$VARIABLE</span></code> references — including SLURM variables such as <code class="docutils literal notranslate"><span class="pre">$SLURM_PROCID</span></code> and <code class="docutils literal notranslate"><span class="pre">$SLURM_JOB_NODELIST</span></code> — to empty strings. This silently breaks launcher scripts and causes the training to hang.</p>
+<p><strong>Workaround</strong>: use the training scripts directly with <code class="docutils literal notranslate"><span class="pre">sbatch</span></code> CLI overrides instead of piping through <code class="docutils literal notranslate"><span class="pre">envsubst</span></code>. For example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span data-line="1">sbatch<span class="w"> </span>--nodes<span class="w"> </span><span class="m">4</span><span class="w"> </span>--time<span class="w"> </span><span class="m">06</span>:00:00<span class="w"> </span>sbatch_train.sh<span class="w"> </span>config.yaml
+</span></pre></div>
+</div>
+</section>
 </section>
 
         </article><button class="back-to-top" type="button">
@@ -166,10 +177,10 @@ data-aria-dark="Switch to auto color mode">
   </svg>
   <span>Back to top</span>
 </button><div class="navigation flex print:hidden"><div class="navigation-prev">
-    <a href="training.html">
+    <a href="evaluation.html">
       <i class="i-lucide chevron-left"></i>
       <div class="page-info">
-        <span>Previous</span><div class="title">Training a MultiMeditron model</div></div>
+        <span>Previous</span><div class="title">Evaluating a MultiMeditron model</div></div>
     </a>
   </div><div class="navigation-next">
     <a href="configuration.html">
